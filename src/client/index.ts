@@ -1,91 +1,35 @@
-import type { GenericActionCtx, GenericDataModel } from "convex/server";
+import type {
+  FunctionArgs,
+  FunctionReturnType,
+  GenericActionCtx,
+  GenericDataModel,
+} from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
 
-export type SearchDepth = "basic" | "advanced";
-export type SearchTopic = "general" | "news" | "finance";
-export type TimeRange = "day" | "week" | "month" | "year";
-export type AnswerMode = boolean | "basic" | "advanced";
-export type RawContentMode = boolean | "markdown" | "text";
-export type ExtractDepth = "basic" | "advanced";
-export type ExtractFormat = "markdown" | "text";
+type SearchFunction = ComponentApi["lib"]["search"];
+type ExtractFunction = ComponentApi["lib"]["extract"];
 
-export interface SearchArgs {
-  query: string;
-  searchDepth?: SearchDepth;
-  topic?: SearchTopic;
-  maxResults?: number;
-  includeImages?: boolean;
-  includeImageDescriptions?: boolean;
-  includeAnswer?: AnswerMode;
-  includeRawContent?: RawContentMode;
-  includeDomains?: string[];
-  excludeDomains?: string[];
-  timeRange?: TimeRange;
-  includeFavicon?: boolean;
-  includeUsage?: boolean;
-}
+// All public types are derived from the component's generated ComponentApi,
+// which codegen produces from the validators in src/component/lib.ts — the
+// single source of truth. Do not hand-maintain copies of these shapes.
 
-export interface SearchResult {
-  title: string;
-  url: string;
-  content: string;
-  score: number;
-  rawContent?: string;
-  publishedDate?: string;
-  favicon?: string;
-}
+export type SearchArgs = FunctionArgs<SearchFunction>;
+export type SearchResponse = FunctionReturnType<SearchFunction>;
+export type SearchResult = SearchResponse["results"][number];
+export type SearchImage = SearchResponse["images"][number];
+export type Usage = NonNullable<SearchResponse["usage"]>;
+export type SearchDepth = NonNullable<SearchArgs["searchDepth"]>;
+export type SearchTopic = NonNullable<SearchArgs["topic"]>;
+export type TimeRange = NonNullable<SearchArgs["timeRange"]>;
+export type AnswerMode = NonNullable<SearchArgs["includeAnswer"]>;
+export type RawContentMode = NonNullable<SearchArgs["includeRawContent"]>;
 
-export interface SearchImage {
-  url: string;
-  description?: string;
-}
-
-export interface Usage {
-  credits: number;
-}
-
-export interface SearchResponse {
-  query: string;
-  answer?: string;
-  images: SearchImage[];
-  results: SearchResult[];
-  responseTime?: number;
-  requestId?: string;
-  usage?: Usage;
-}
-
-export interface ExtractArgs {
-  urls: string[];
-  query?: string;
-  chunksPerSource?: number;
-  extractDepth?: ExtractDepth;
-  format?: ExtractFormat;
-  includeImages?: boolean;
-  includeFavicon?: boolean;
-  includeUsage?: boolean;
-  timeout?: number;
-}
-
-export interface ExtractResult {
-  url: string;
-  title?: string;
-  rawContent: string;
-  images: string[];
-  favicon?: string;
-}
-
-export interface ExtractFailure {
-  url: string;
-  error: string;
-}
-
-export interface ExtractResponse {
-  results: ExtractResult[];
-  failedResults: ExtractFailure[];
-  responseTime?: number;
-  requestId?: string;
-  usage?: Usage;
-}
+export type ExtractArgs = FunctionArgs<ExtractFunction>;
+export type ExtractResponse = FunctionReturnType<ExtractFunction>;
+export type ExtractResult = ExtractResponse["results"][number];
+export type ExtractFailure = ExtractResponse["failedResults"][number];
+export type ExtractDepth = NonNullable<ExtractArgs["extractDepth"]>;
+export type ExtractFormat = NonNullable<ExtractArgs["format"]>;
 
 export type ActionCtx = Pick<GenericActionCtx<GenericDataModel>, "runAction">;
 

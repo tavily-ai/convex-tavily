@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { _test } from "./lib.js";
 
 describe("Tavily component", () => {
@@ -81,5 +81,13 @@ describe("Tavily component", () => {
       "Content-Type": "application/json",
       "X-Client-Source": "convex-tavily",
     });
+  });
+
+  test("fails fast with an actionable error when the API key is missing", () => {
+    vi.stubEnv("TAVILY_API_KEY", "");
+    expect(() => _test.requireApiKey()).toThrow(/TAVILY_API_KEY is not set/);
+
+    vi.stubEnv("TAVILY_API_KEY", "tvly-configured");
+    expect(_test.requireApiKey()).toBe("tvly-configured");
   });
 });

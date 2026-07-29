@@ -188,6 +188,18 @@ function buildHeaders(apiKey: string) {
   };
 }
 
+function requireApiKey(): string {
+  const apiKey = env.TAVILY_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "TAVILY_API_KEY is not set. Set it on the Convex deployment " +
+        "(npx convex env set TAVILY_API_KEY ...) and wire it to the tavily " +
+        "component in convex/convex.config.ts.",
+    );
+  }
+  return apiKey;
+}
+
 async function callTavilyApi(
   endpoint: "/search" | "/extract",
   body: Record<string, unknown>,
@@ -195,7 +207,7 @@ async function callTavilyApi(
 ) {
   const response = await fetch(`${TAVILY_BASE_URL}${endpoint}`, {
     method: "POST",
-    headers: buildHeaders(env.TAVILY_API_KEY),
+    headers: buildHeaders(requireApiKey()),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutSeconds * 1_000),
   });
@@ -425,6 +437,7 @@ export const _test = {
   validateSearchArgs,
   validateExtractArgs,
   buildHeaders,
+  requireApiKey,
   normalizeSearchResponse,
   normalizeExtractResponse,
   readErrorMessage,

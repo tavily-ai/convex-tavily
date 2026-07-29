@@ -58,7 +58,7 @@ button {
   display: grid;
   grid-template-rows: auto 1fr;
   height: 100%;
-  max-width: 880px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 1rem 1rem 0;
 }
@@ -233,7 +233,7 @@ button {
 .message {
   display: grid;
   gap: 0.35rem;
-  max-width: min(92%, 40rem);
+  max-width: min(92%, 48rem);
   animation: rise 180ms ease-out;
 }
 

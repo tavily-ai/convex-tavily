@@ -81,9 +81,5 @@
     "typescript-eslint": "8.58.2",
     "vite": "8.0.9",
     "vitest": "4.1.4"
-  },
-  "dependencies": {
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
   }
 }
