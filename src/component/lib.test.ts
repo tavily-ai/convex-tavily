@@ -10,6 +10,9 @@ describe("Tavily component", () => {
         maxResults: 8,
         includeRawContent: "markdown",
         includeUsage: true,
+        timeRange: "week",
+        includeImages: true,
+        includeFavicon: true,
       }),
     ).toEqual({
       query: "latest Convex releases",
@@ -17,6 +20,9 @@ describe("Tavily component", () => {
       max_results: 8,
       include_raw_content: "markdown",
       include_usage: true,
+      time_range: "week",
+      include_images: true,
+      include_favicon: true,
     });
   });
 
@@ -67,6 +73,75 @@ describe("Tavily component", () => {
         chunksPerSource: 3,
       }),
     ).toThrow(/requires query/);
+  });
+
+  test("builds research bodies for poll and stream modes", () => {
+    expect(
+      _test.buildResearchBody(
+        {
+          input: "Convex components landscape",
+          model: "mini",
+          citationFormat: "numbered",
+        },
+        false,
+      ),
+    ).toEqual({
+      input: "Convex components landscape",
+      model: "mini",
+      stream: false,
+      citation_format: "numbered",
+    });
+
+    expect(
+      _test.buildResearchBody(
+        { input: "Convex components landscape", model: "pro" },
+        true,
+      ),
+    ).toEqual({
+      input: "Convex components landscape",
+      model: "pro",
+      stream: true,
+    });
+  });
+
+  test("normalizes research stream content and tool events", () => {
+    expect(
+      _test.normalizeStreamEvent({
+        id: "evt_1",
+        object: "chat.completion.chunk",
+        model: "mini",
+        choices: [{ delta: { role: "assistant", content: "# Report\n" } }],
+      }),
+    ).toEqual({ type: "content", content: "# Report\n" });
+
+    expect(
+      _test.normalizeStreamEvent({
+        object: "chat.completion.chunk",
+        choices: [
+          {
+            delta: {
+              tool_calls: {
+                type: "tool_call",
+                tool_call: [
+                  {
+                    name: "WebSearch",
+                    id: "fc_1",
+                    arguments: "Executing searches",
+                    queries: ["convex components"],
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      }),
+    ).toEqual({
+      type: "tool_call",
+      name: "WebSearch",
+      id: "fc_1",
+      arguments: "Executing searches",
+      queries: ["convex components"],
+    });
   });
 
   test("uses bearer authentication without putting the key in the body", () => {

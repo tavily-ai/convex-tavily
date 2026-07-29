@@ -38,3 +38,19 @@ export const extractPages = action({
     });
   },
 });
+
+export const researchTopic = action({
+  args: {
+    input: v.string(),
+    model: v.optional(
+      v.union(v.literal("mini"), v.literal("pro"), v.literal("auto")),
+    ),
+  },
+  handler: async (ctx, args) => {
+    return await tavily.researchStream(ctx, {
+      input: args.input,
+      model: args.model ?? "mini",
+      citationFormat: "numbered",
+    });
+  },
+});
