@@ -8,9 +8,9 @@ import {
 import { api } from "../convex/_generated/api";
 
 const SUGGESTIONS = [
-  "What shipped recently in Convex components?",
-  "Summarize Tavily's search API for agents",
-  "Find docs on Convex actions vs mutations",
+  "What are the top headlines in tech and markets right now?",
+  "Pull the latest Fed rate decision and what analysts said about it",
+  "Deep research: how are companies using AI agents in customer support in 2026?",
 ];
 
 const THREAD_KEY = "tavily-convex-thread";
@@ -147,8 +147,9 @@ function Chat({ threadId }: { threadId: string }) {
             <p>
               This assistant calls the{" "}
               <strong>@tavily/convex-tavily</strong> component from Convex Agent
-              tools — search first, extract when it needs the full page.
+              tools — search, extract, or deep research (Tavily Research stream).
             </p>
+
             <div className="suggestions">
               {SUGGESTIONS.map((s) => (
                 <button

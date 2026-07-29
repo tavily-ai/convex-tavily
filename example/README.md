@@ -1,6 +1,6 @@
 # Tavily × Convex chat example
 
-Live demo app that installs `@tavily/convex-tavily` as a Convex component and exposes it as Agent tools (`webSearch`, `extractPages`).
+Live demo app that installs `@tavily/convex-tavily` as a Convex component and exposes it as Agent tools (`webSearch`, `extractPages`, `deepResearch`).
 
 ## Prerequisites
 
@@ -41,15 +41,14 @@ npx convex env set OPENAI_API_KEY sk-...
 
 ## What to try
 
-Ask something time-sensitive, e.g. “What shipped recently in Convex components?” — the agent should call `webSearch`, then answer with citations. Follow up with a URL to trigger `extractPages`.
+Ask something time-sensitive, e.g. “What shipped recently in Convex components?” — the agent should call `webSearch`, then answer with citations. Follow up with a URL to trigger `extractPages`. Ask for a competitive landscape or in-depth brief to trigger `deepResearch` (uses the component’s `researchStream`).
 
 ## Layout
 
 | Path | Role |
 |---|---|
-| `convex/tavily.ts` | shared `TavilyClient` helpers (`searchWeb` / `extractPages` / `researchTopic`) |
-| `convex/tools.ts` | Agent tools wrapping those helpers |
-| `convex/agent.ts` | `@convex-dev/agent` + OpenAI |
+| `convex/tavily.ts` | shared `TavilyClient` helpers (`searchWeb` / `extractPages` / `researchTopic` → `researchStream`) |
+| `convex/tools.ts` | Agent tools wrapping those helpers (`webSearch`, `extractPages`, `deepResearch`) || `convex/agent.ts` | `@convex-dev/agent` + OpenAI |
 | `convex/chat.ts` | threads / send / list messages |
 | `convex/example.ts` | public actions wrapping the same helpers |
 | `src/` | React chat UI |

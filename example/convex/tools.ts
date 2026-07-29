@@ -2,6 +2,7 @@ import { createTool } from "@convex-dev/agent";
 import { z } from "zod";
 import {
   extractPages as runExtract,
+  researchTopic as runResearch,
   searchWeb as runSearch,
 } from "./tavily.js";
 
@@ -57,6 +58,47 @@ export const extractPages = createTool({
         rawContent: r.rawContent.slice(0, 10000),
       })),
       failedResults: response.failedResults,
+    };
+  },
+});
+
+/**
+ * End-to-end Tavily Research via the component's researchStream action.
+ * Consumes Tavily SSE inside Convex and returns the final report + sources.
+ */
+export const deepResearch = createTool({
+  description:
+    "Run a comprehensive multi-source research report. Prefer this over webSearch when the user wants an in-depth analysis, competitive landscape, literature-style brief, or a synthesized report with citations. Slower and more thorough than a single search.",
+  inputSchema: z.object({
+    input: z
+      .string()
+      .describe(
+        "A clear research brief: goal, known context, constraints, and desired output",
+      ),
+    model: z
+      .enum(["mini", "pro", "auto"])
+      .optional()
+      .describe(
+        "mini = focused/narrow, pro = broad multi-topic, auto = let Tavily choose (default mini)",
+      ),
+  }),
+  execute: async (ctx, { input, model }) => {
+    const response = await runResearch(ctx, {
+      input,
+      model: model ?? "mini",
+    });
+    const steps = response.events
+      .filter((e) => e.type === "tool_call" && e.name)
+      .map((e) => e.name as string);
+
+    return {
+      content: response.content?.slice(0, 50000) ?? "",
+      sources: response.sources.slice(0, 40).map((s) => ({
+        url: s.url,
+        title: s.title,
+      })),
+      model: response.model,
+      steps,
     };
   },
 });
