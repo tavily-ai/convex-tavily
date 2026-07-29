@@ -1,0 +1,9 @@
+{
+  "name": "convex-tavily-example",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@tavily/convex-tavily": "file:..",
+    "convex": "^1.42.3"
+  }
+}
