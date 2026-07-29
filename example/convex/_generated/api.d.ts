@@ -11,6 +11,7 @@
 import type * as agent from "../agent.js";
 import type * as chat from "../chat.js";
 import type * as example from "../example.js";
+import type * as tavily from "../tavily.js";
 import type * as tools from "../tools.js";
 
 import type {
@@ -23,6 +24,7 @@ declare const fullApi: ApiFromModules<{
   agent: typeof agent;
   chat: typeof chat;
   example: typeof example;
+  tavily: typeof tavily;
   tools: typeof tools;
 }>;
 

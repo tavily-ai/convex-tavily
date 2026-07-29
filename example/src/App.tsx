@@ -51,10 +51,21 @@ export function App() {
     <div className="app">
       <header className="brand-bar">
         <div className="brand">
-          <div className="brand-mark">
-            Tavily <span>×</span> Convex
-          </div>
-          <div className="brand-sub">component demo · live web search chat</div>
+          <a
+            href="https://www.tavily.com"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Tavily"
+          >
+            <img
+              className="brand-logo"
+              src="/brand/tavily-full.svg"
+              alt="Tavily"
+              width={186}
+              height={56}
+            />
+          </a>
+          <div className="brand-sub">convex component demo · live web search</div>
         </div>
         <button type="button" className="new-thread" onClick={() => void resetThread()}>
           New thread
@@ -125,6 +136,13 @@ function Chat({ threadId }: { threadId: string }) {
       <div className="messages">
         {results.length === 0 ? (
           <div className="empty">
+            <img
+              className="empty-mark"
+              src="/brand/tavily-mark-black.svg"
+              alt=""
+              width={127}
+              height={127}
+            />
             <h2>Ask the live web</h2>
             <p>
               This assistant calls the{" "}
@@ -175,25 +193,74 @@ function Chat({ threadId }: { threadId: string }) {
   );
 }
 
+type ToolPart = {
+  type: string;
+  toolCallId?: string;
+  toolName?: string;
+  state?: string;
+  input?: unknown;
+  output?: unknown;
+  errorText?: string;
+};
+
+function toolPartsFromMessage(message: UIMessage): ToolPart[] {
+  return message.parts.filter(
+    (p): p is UIMessage["parts"][number] & ToolPart =>
+      p.type.startsWith("tool-") || p.type === "dynamic-tool",
+  );
+}
+
+function toolDisplayName(part: ToolPart): string {
+  if (part.type === "dynamic-tool" && part.toolName) return part.toolName;
+  return part.type.replace(/^tool-/, "");
+}
+
+function formatJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 function MessageBubble({ message }: { message: UIMessage }) {
-  const toolNames = [
-    ...new Set(
-      message.parts
-        .map((p) => p.type)
-        .filter((t) => t.startsWith("tool-"))
-        .map((t) => t.replace(/^tool-/, "")),
-    ),
-  ];
+  const tools = toolPartsFromMessage(message);
 
   return (
     <article className={`message ${message.role}`}>
       <div className="role">{message.role === "user" ? "You" : "Assistant"}</div>
-      {toolNames.length > 0 ? (
-        <div className="tool-bits">
-          {toolNames.map((name) => (
-            <span key={name} className="tool-chip">
-              {name}
-            </span>
+      {tools.length > 0 ? (
+        <div className="tool-calls">
+          {tools.map((part, i) => (
+            <details
+              key={part.toolCallId ?? `${part.type}-${i}`}
+              className="tool-call"
+            >
+              <summary>
+                <span className="tool-chip">{toolDisplayName(part)}</span>
+                {part.state ? (
+                  <span className="tool-state">{part.state}</span>
+                ) : null}
+              </summary>
+              {part.input !== undefined ? (
+                <div className="tool-section">
+                  <div className="tool-label">args</div>
+                  <pre>{formatJson(part.input)}</pre>
+                </div>
+              ) : null}
+              {part.output !== undefined ? (
+                <div className="tool-section">
+                  <div className="tool-label">result</div>
+                  <pre>{formatJson(part.output)}</pre>
+                </div>
+              ) : null}
+              {part.errorText ? (
+                <div className="tool-section tool-error">
+                  <div className="tool-label">error</div>
+                  <pre>{part.errorText}</pre>
+                </div>
+              ) : null}
+            </details>
           ))}
         </div>
       ) : null}

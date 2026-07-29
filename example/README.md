@@ -47,8 +47,9 @@ Ask something time-sensitive, e.g. “What shipped recently in Convex components
 
 | Path | Role |
 |---|---|
-| `convex/tools.ts` | Tavily tools via `TavilyClient` |
+| `convex/tavily.ts` | shared `TavilyClient` helpers (`searchWeb` / `extractPages` / `researchTopic`) |
+| `convex/tools.ts` | Agent tools wrapping those helpers |
 | `convex/agent.ts` | `@convex-dev/agent` + OpenAI |
 | `convex/chat.ts` | threads / send / list messages |
-| `convex/example.ts` | raw `searchWeb` / `extractPages` / `researchTopic` actions |
+| `convex/example.ts` | public actions wrapping the same helpers |
 | `src/` | React chat UI |

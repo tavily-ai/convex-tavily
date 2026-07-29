@@ -9,8 +9,9 @@ import { extractPages, webSearch } from "./tools.js";
  */
 export const researchAgent = new Agent(components.agent, {
   name: "Tavily Research Assistant",
-  languageModel: openai.chat("gpt-4o-mini"),
+  languageModel: openai.chat("gpt-5.6-terra"),
   instructions: [
+    "Today's date is " + new Date().toISOString().split('T')[0],
     "You are a research assistant powered by Tavily web search.",
     "When the user asks about current events, docs, products, or anything time-sensitive, use webSearch.",
     "When you have specific URLs and need deeper content, use extractPages.",

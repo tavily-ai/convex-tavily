@@ -1,9 +1,10 @@
 import { v } from "convex/values";
-import { TavilyClient } from "@tavily/convex-tavily";
-import { components } from "./_generated/api.js";
 import { action } from "./_generated/server.js";
-
-const tavily = new TavilyClient(components.tavily);
+import {
+  extractPages as runExtract,
+  researchTopic as runResearch,
+  searchWeb as runSearch,
+} from "./tavily.js";
 
 export const searchWeb = action({
   args: {
@@ -12,14 +13,7 @@ export const searchWeb = action({
     includeDomains: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    return await tavily.search(ctx, {
-      query: args.query,
-      searchDepth: "advanced",
-      maxResults: args.maxResults ?? 5,
-      includeDomains: args.includeDomains,
-      includeAnswer: false,
-      includeFavicon: true,
-    });
+    return await runSearch(ctx, args);
   },
 });
 
@@ -29,13 +23,7 @@ export const extractPages = action({
     query: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await tavily.extract(ctx, {
-      urls: args.urls,
-      query: args.query,
-      chunksPerSource: args.query ? 3 : undefined,
-      extractDepth: "advanced",
-      format: "markdown",
-    });
+    return await runExtract(ctx, args);
   },
 });
 
@@ -47,10 +35,6 @@ export const researchTopic = action({
     ),
   },
   handler: async (ctx, args) => {
-    return await tavily.researchStream(ctx, {
-      input: args.input,
-      model: args.model ?? "mini",
-      citationFormat: "numbered",
-    });
+    return await runResearch(ctx, args);
   },
 });

@@ -1,9 +1,9 @@
 import { createTool } from "@convex-dev/agent";
-import { TavilyClient } from "@tavily/convex-tavily";
 import { z } from "zod";
-import { components } from "./_generated/api.js";
-
-const tavily = new TavilyClient(components.tavily);
+import {
+  extractPages as runExtract,
+  searchWeb as runSearch,
+} from "./tavily.js";
 
 /** Web search via the Tavily Convex component. */
 export const webSearch = createTool({
@@ -19,12 +19,7 @@ export const webSearch = createTool({
       .describe("How many results to return (default 5)"),
   }),
   execute: async (ctx, { query, maxResults }) => {
-    const response = await tavily.search(ctx, {
-      query,
-      searchDepth: "advanced",
-      maxResults: maxResults ?? 5,
-      includeFavicon: true,
-    });
+    const response = await runSearch(ctx, { query, maxResults });
     return {
       query: response.query,
       results: response.results.map((r) => ({
@@ -53,19 +48,13 @@ export const extractPages = createTool({
       .describe("Optional focus query to chunk relevant passages"),
   }),
   execute: async (ctx, { urls, query }) => {
-    const response = await tavily.extract(ctx, {
-      urls,
-      query,
-      chunksPerSource: query ? 3 : undefined,
-      extractDepth: "advanced",
-      format: "markdown",
-    });
+    const response = await runExtract(ctx, { urls, query });
     return {
       results: response.results.map((r) => ({
         url: r.url,
         title: r.title,
         // Cap payload size for the LLM context window.
-        rawContent: r.rawContent.slice(0, 6000),
+        rawContent: r.rawContent.slice(0, 10000),
       })),
       failedResults: response.failedResults,
     };
