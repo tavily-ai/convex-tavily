@@ -1,6 +1,6 @@
 # convex-tavily
 
-Tavily web search, content extraction, and research for Convex applications.
+Tavily web search and content extraction for Convex applications.
 
 This package installs Tavily as an isolated Convex component. Application actions call a typed `TavilyClient`, which delegates to component actions and keeps `TAVILY_API_KEY` in typed Convex environment configuration.
 
@@ -87,53 +87,20 @@ export const extractPages = action({
 });
 ```
 
-## Research
-
-Use streaming when you want Tavily's SSE progress events collected into one action result:
-
-```ts
-export const researchTopic = action({
-  args: { input: v.string() },
-  handler: async (ctx, args) => {
-    return await tavily.researchStream(ctx, {
-      input: args.input,
-      model: "mini",
-      citationFormat: "numbered",
-    });
-  },
-});
-```
-
-Or start a job and poll:
-
-```ts
-const job = await tavily.research(ctx, { input, model: "pro" });
-let result = await tavily.getResearch(ctx, { requestId: job.requestId });
-while (result.status !== "completed" && result.status !== "failed") {
-  // wait, then poll again
-  result = await tavily.getResearch(ctx, { requestId: job.requestId });
-}
-```
-
 ## Request flow
 
 ```text
 App client
   -> application Convex action
-  -> TavilyClient.search/extract/research/researchStream
-  -> ctx.runAction(components.tavily.lib.*)
-  -> https://api.tavily.com/search | /extract | /research
+  -> TavilyClient.search/extract
+  -> ctx.runAction(components.tavily.lib.search/extract)
+  -> POST https://api.tavily.com/search or /extract
 ```
-
-There are no component HTTP routes. `researchStream` consumes Tavily's SSE stream inside the Convex action and returns progress `events` plus the final report. Use `research` + `getResearch` when you want async polling instead.
 
 ## Current API
 
 - `search(ctx, args)` — Search (`basic`/`advanced` depth, `timeRange`, images/favicon/usage knobs).
 - `extract(ctx, args)` — Extract up to 20 URLs, including query-focused chunks, images, timeout.
-- `research(ctx, args)` — Start a research task; returns `requestId`.
-- `getResearch(ctx, { requestId })` — Poll research status/content.
-- `researchStream(ctx, args)` — Stream research via SSE; returns `events`, `content`, `sources`.
 
 The component is stateless and owns no database tables.
 
@@ -147,21 +114,5 @@ npm test
 npm run lint
 npm run typecheck
 ```
-
-### Chat example
-
-`example/` is a Vite + React chatbot that uses this component via `@convex-dev/agent` tools. From the repo root:
-
-```bash
-# set keys on the example Convex deployment
-cd example
-npx convex env set TAVILY_API_KEY tvly-...
-npx convex env set OPENAI_API_KEY sk-...
-cd ..
-
-npm run dev   # builds package + convex dev + Vite UI
-```
-
-Open http://localhost:5173 — see [example/README.md](./example/README.md).
 
 Component code generation may require a configured Convex development deployment.

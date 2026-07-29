@@ -2,7 +2,6 @@ import { v } from "convex/values";
 import { action } from "./_generated/server.js";
 import {
   extractPages as runExtract,
-  researchTopic as runResearch,
   searchWeb as runSearch,
 } from "./tavily.js";
 
@@ -24,17 +23,5 @@ export const extractPages = action({
   },
   handler: async (ctx, args) => {
     return await runExtract(ctx, args);
-  },
-});
-
-export const researchTopic = action({
-  args: {
-    input: v.string(),
-    model: v.optional(
-      v.union(v.literal("mini"), v.literal("pro"), v.literal("auto")),
-    ),
-  },
-  handler: async (ctx, args) => {
-    return await runResearch(ctx, args);
   },
 });

@@ -1,4 +1,10 @@
-import { createThread, listUIMessages, saveMessage } from "@convex-dev/agent";
+import {
+  createThread,
+  listUIMessages,
+  saveMessage,
+  syncStreams,
+  vStreamArgs,
+} from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api.js";
@@ -49,21 +55,30 @@ export const generateResponse = internalAction({
     promptMessageId: v.string(),
   },
   handler: async (ctx, { threadId, promptMessageId }) => {
-    await researchAgent.generateText(
+    await researchAgent.streamText(
       ctx,
       { threadId },
       { promptMessageId },
+      {
+        saveStreamDeltas: {
+          chunking: "line",
+          throttleMs: 200,
+        },
+      },
     );
   },
 });
 
-/** List UI messages for a thread. */
+/** List UI messages for a thread (includes live stream deltas when requested). */
 export const listMessages = query({
   args: {
     threadId: v.string(),
     paginationOpts: paginationOptsValidator,
+    streamArgs: vStreamArgs,
   },
   handler: async (ctx, args) => {
-    return await listUIMessages(ctx, components.agent, args);
+    const paginated = await listUIMessages(ctx, components.agent, args);
+    const streams = await syncStreams(ctx, components.agent, args);
+    return { ...paginated, streams };
   },
 });

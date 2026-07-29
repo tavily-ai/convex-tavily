@@ -1,7 +1,6 @@
 import {
   TavilyClient,
   type ActionCtx,
-  type ResearchModel,
 } from "@tavily/convex-tavily";
 import { components } from "./_generated/api.js";
 
@@ -38,19 +37,5 @@ export async function extractPages(
     chunksPerSource: args.query ? 3 : undefined,
     extractDepth: "advanced",
     format: "markdown",
-  });
-}
-
-export async function researchTopic(
-  ctx: ActionCtx,
-  args: {
-    input: string;
-    model?: ResearchModel;
-  },
-) {
-  return await tavily.researchStream(ctx, {
-    input: args.input,
-    model: args.model ?? "mini",
-    citationFormat: "numbered",
   });
 }

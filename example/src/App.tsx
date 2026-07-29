@@ -5,12 +5,14 @@ import {
   useUIMessages,
   type UIMessage,
 } from "@convex-dev/agent/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../convex/_generated/api";
 
 const SUGGESTIONS = [
   "What are the top headlines in tech and markets right now?",
   "Pull the latest Fed rate decision and what analysts said about it",
-  "Deep research: how are companies using AI agents in customer support in 2026?",
+  "Find docs on Convex actions vs mutations",
 ];
 
 const THREAD_KEY = "tavily-convex-thread";
@@ -65,9 +67,15 @@ export function App() {
               height={56}
             />
           </a>
-          <div className="brand-sub">convex component demo · live web search</div>
+          <div className="brand-sub">
+            convex component demo · live web search
+          </div>
         </div>
-        <button type="button" className="new-thread" onClick={() => void resetThread()}>
+        <button
+          type="button"
+          className="new-thread"
+          onClick={() => void resetThread()}
+        >
           New thread
         </button>
       </header>
@@ -92,7 +100,7 @@ function Chat({ threadId }: { threadId: string }) {
   const { results } = useUIMessages(
     api.chat.listMessages,
     { threadId },
-    { initialNumItems: 40 },
+    { initialNumItems: 40, stream: true },
   );
   const sendMessage = useMutation(api.chat.sendMessage).withOptimisticUpdate(
     optimisticallySendMessage(api.chat.listMessages),
@@ -104,7 +112,7 @@ function Chat({ threadId }: { threadId: string }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [results.length, pending]);
+  }, [results.length, pending, results]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -147,9 +155,8 @@ function Chat({ threadId }: { threadId: string }) {
             <p>
               This assistant calls the{" "}
               <strong>@tavily/convex-tavily</strong> component from Convex Agent
-              tools — search, extract, or deep research (Tavily Research stream).
+              tools — search first, extract when it needs the full page.
             </p>
-
             <div className="suggestions">
               {SUGGESTIONS.map((s) => (
                 <button
@@ -164,7 +171,9 @@ function Chat({ threadId }: { threadId: string }) {
             </div>
           </div>
         ) : (
-          results.map((message) => <MessageBubble key={message.key} message={message} />)
+          results.map((message) => (
+            <MessageBubble key={message.key} message={message} />
+          ))
         )}
         <div ref={bottomRef} />
       </div>
@@ -186,7 +195,11 @@ function Chat({ threadId }: { threadId: string }) {
           rows={2}
           disabled={pending}
         />
-        <button className="send" type="submit" disabled={!prompt.trim() || pending}>
+        <button
+          className="send"
+          type="submit"
+          disabled={!prompt.trim() || pending}
+        >
           Send
         </button>
       </form>
@@ -216,6 +229,52 @@ function toolDisplayName(part: ToolPart): string {
   return part.type.replace(/^tool-/, "");
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Short label for the collapsed tool row (query or URLs). */
+function toolQueryPreview(part: ToolPart): string | null {
+  const input = asRecord(part.input);
+  if (!input) return null;
+
+  if (typeof input.query === "string" && input.query.trim()) {
+    return input.query.trim();
+  }
+  if (Array.isArray(input.urls) && input.urls.length > 0) {
+    const urls = input.urls.filter((u): u is string => typeof u === "string");
+    if (urls.length === 1) return urls[0];
+    if (urls.length > 1) return `${urls.length} URLs`;
+  }
+  return null;
+}
+
+function toolStatusLabel(part: ToolPart): { label: string; tone: string } {
+  if (part.errorText || part.state === "output-error") {
+    return { label: "error", tone: "error" };
+  }
+  if (part.state === "input-streaming") {
+    return { label: "preparing", tone: "live" };
+  }
+  if (part.state === "input-available") {
+    return { label: "running", tone: "live" };
+  }
+  if (part.state === "output-available") {
+    const output = asRecord(part.output);
+    if (output && Array.isArray(output.results)) {
+      const n = output.results.length;
+      return {
+        label: n === 1 ? "1 result" : `${n} results`,
+        tone: "done",
+      };
+    }
+    return { label: "done", tone: "done" };
+  }
+  return { label: part.state ?? "pending", tone: "muted" };
+}
+
 function formatJson(value: unknown): string {
   try {
     return JSON.stringify(value, null, 2);
@@ -224,50 +283,133 @@ function formatJson(value: unknown): string {
   }
 }
 
+function ToolResultList({ output }: { output: unknown }) {
+  const record = asRecord(output);
+  const results = record?.results;
+  if (!Array.isArray(results) || results.length === 0) {
+    return (
+      <div className="tool-section">
+        <div className="tool-label">result</div>
+        <pre>{formatJson(output)}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tool-section">
+      <div className="tool-label">results</div>
+      <ul className="tool-result-list">
+        {results.map((item, i) => {
+          const row = asRecord(item);
+          if (!row) return null;
+          const title =
+            typeof row.title === "string"
+              ? row.title
+              : typeof row.url === "string"
+                ? row.url
+                : `Result ${i + 1}`;
+          const url = typeof row.url === "string" ? row.url : undefined;
+          const content =
+            typeof row.content === "string"
+              ? row.content
+              : typeof row.rawContent === "string"
+                ? row.rawContent
+                : undefined;
+          return (
+            <li key={url ?? `${title}-${i}`}>
+              {url ? (
+                <a href={url} target="_blank" rel="noreferrer">
+                  {title}
+                </a>
+              ) : (
+                <strong>{title}</strong>
+              )}
+              {content ? (
+                <p className="tool-result-snippet">
+                  {content.slice(0, 220)}
+                  {content.length > 220 ? "…" : ""}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function MarkdownBody({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noreferrer">
+            {children}
+          </a>
+        ),
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+}
+
 function MessageBubble({ message }: { message: UIMessage }) {
   const tools = toolPartsFromMessage(message);
+  const isUser = message.role === "user";
+  const body = message.text || (message.status === "pending" ? "…" : "");
 
   return (
     <article className={`message ${message.role}`}>
-      <div className="role">{message.role === "user" ? "You" : "Assistant"}</div>
+      <div className="role">{isUser ? "You" : "Assistant"}</div>
       {tools.length > 0 ? (
         <div className="tool-calls">
-          {tools.map((part, i) => (
-            <details
-              key={part.toolCallId ?? `${part.type}-${i}`}
-              className="tool-call"
-            >
-              <summary>
-                <span className="tool-chip">{toolDisplayName(part)}</span>
-                {part.state ? (
-                  <span className="tool-state">{part.state}</span>
+          {tools.map((part, i) => {
+            const name = toolDisplayName(part);
+            const query = toolQueryPreview(part);
+            const status = toolStatusLabel(part);
+            return (
+              <details
+                key={part.toolCallId ?? `${part.type}-${i}`}
+                className="tool-call"
+              >
+                <summary>
+                  <span className="tool-chip">{name}</span>
+                  {query ? (
+                    <span className="tool-query" title={query}>
+                      {query}
+                    </span>
+                  ) : null}
+                  <span className={`tool-state tone-${status.tone}`}>
+                    {status.label}
+                  </span>
+                </summary>
+                {part.input !== undefined ? (
+                  <div className="tool-section">
+                    <div className="tool-label">args</div>
+                    <pre>{formatJson(part.input)}</pre>
+                  </div>
                 ) : null}
-              </summary>
-              {part.input !== undefined ? (
-                <div className="tool-section">
-                  <div className="tool-label">args</div>
-                  <pre>{formatJson(part.input)}</pre>
-                </div>
-              ) : null}
-              {part.output !== undefined ? (
-                <div className="tool-section">
-                  <div className="tool-label">result</div>
-                  <pre>{formatJson(part.output)}</pre>
-                </div>
-              ) : null}
-              {part.errorText ? (
-                <div className="tool-section tool-error">
-                  <div className="tool-label">error</div>
-                  <pre>{part.errorText}</pre>
-                </div>
-              ) : null}
-            </details>
-          ))}
+                {part.output !== undefined ? (
+                  <ToolResultList output={part.output} />
+                ) : null}
+                {part.errorText ? (
+                  <div className="tool-section tool-error">
+                    <div className="tool-label">error</div>
+                    <pre>{part.errorText}</pre>
+                  </div>
+                ) : null}
+              </details>
+            );
+          })}
         </div>
       ) : null}
-      <div className="bubble">
-        {message.text || (message.status === "pending" ? "…" : "")}
-      </div>
+      {body ? (
+        <div className={`bubble${isUser ? "" : " markdown"}`}>
+          {isUser ? body : <MarkdownBody text={body} />}
+        </div>
+      ) : null}
     </article>
   );
 }

@@ -4,6 +4,14 @@
   "description": "Tavily web search and content extraction for Convex applications",
   "type": "module",
   "license": "Apache-2.0",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tavily-ai/convex-tavily.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "convex",
     "component",
@@ -52,7 +60,7 @@
     "lint": "eslint .",
     "test": "vitest run --typecheck",
     "test:watch": "vitest --typecheck --clearScreen false",
-    "prepare": "npm run build"
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "convex": "^1.42.3"
@@ -73,5 +81,9 @@
     "typescript-eslint": "8.58.2",
     "vite": "8.0.9",
     "vitest": "4.1.4"
+  },
+  "dependencies": {
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }

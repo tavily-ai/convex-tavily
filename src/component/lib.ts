@@ -31,29 +31,6 @@ const extractDepthValidator = v.union(
   v.literal("advanced"),
 );
 const formatValidator = v.union(v.literal("markdown"), v.literal("text"));
-const researchModelValidator = v.union(
-  v.literal("mini"),
-  v.literal("pro"),
-  v.literal("auto"),
-);
-const citationFormatValidator = v.union(
-  v.literal("numbered"),
-  v.literal("mla"),
-  v.literal("apa"),
-  v.literal("chicago"),
-);
-const outputLengthValidator = v.union(
-  v.literal("short"),
-  v.literal("standard"),
-  v.literal("long"),
-);
-const researchStatusValidator = v.union(
-  v.literal("pending"),
-  v.literal("in_progress"),
-  v.literal("processing"),
-  v.literal("completed"),
-  v.literal("failed"),
-);
 
 const usageValidator = v.object({ credits: v.number() });
 const imageValidator = v.object({
@@ -96,51 +73,6 @@ const extractResponseValidator = v.object({
   requestId: v.optional(v.string()),
   usage: v.optional(usageValidator),
 });
-const researchSourceValidator = v.object({
-  url: v.string(),
-  title: v.optional(v.string()),
-  favicon: v.optional(v.string()),
-});
-const researchJobResponseValidator = v.object({
-  requestId: v.string(),
-  createdAt: v.optional(v.string()),
-  status: researchStatusValidator,
-  input: v.optional(v.string()),
-  model: v.optional(v.string()),
-  responseTime: v.optional(v.number()),
-});
-const researchGetResponseValidator = v.object({
-  requestId: v.string(),
-  createdAt: v.optional(v.string()),
-  status: researchStatusValidator,
-  content: v.optional(v.string()),
-  sources: v.array(researchSourceValidator),
-  responseTime: v.optional(v.number()),
-  error: v.optional(v.string()),
-});
-const researchStreamEventValidator = v.object({
-  type: v.union(
-    v.literal("tool_call"),
-    v.literal("tool_response"),
-    v.literal("content"),
-    v.literal("sources"),
-    v.literal("error"),
-  ),
-  name: v.optional(v.string()),
-  id: v.optional(v.string()),
-  arguments: v.optional(v.string()),
-  queries: v.optional(v.array(v.string())),
-  sources: v.optional(v.array(researchSourceValidator)),
-  content: v.optional(v.string()),
-  error: v.optional(v.string()),
-});
-const researchStreamResponseValidator = v.object({
-  content: v.optional(v.string()),
-  sources: v.array(researchSourceValidator),
-  events: v.array(researchStreamEventValidator),
-  model: v.optional(v.string()),
-  requestId: v.optional(v.string()),
-});
 
 type SearchArgs = {
   query: string;
@@ -168,26 +100,6 @@ type ExtractArgs = {
   includeFavicon?: boolean;
   includeUsage?: boolean;
   timeout?: number;
-};
-
-type ResearchArgs = {
-  input: string;
-  model?: "mini" | "pro" | "auto";
-  citationFormat?: "numbered" | "mla" | "apa" | "chicago";
-  includeDomains?: string[];
-  excludeDomains?: string[];
-  outputLength?: "short" | "standard" | "long";
-};
-
-type ResearchStreamEvent = {
-  type: "tool_call" | "tool_response" | "content" | "sources" | "error";
-  name?: string;
-  id?: string;
-  arguments?: string;
-  queries?: string[];
-  sources?: Array<{ url: string; title?: string; favicon?: string }>;
-  content?: string;
-  error?: string;
 };
 
 function compactRecord(entries: Array<[string, unknown]>) {
@@ -223,18 +135,6 @@ function buildExtractBody(args: ExtractArgs) {
     ["include_favicon", args.includeFavicon],
     ["include_usage", args.includeUsage],
     ["timeout", args.timeout],
-  ]);
-}
-
-function buildResearchBody(args: ResearchArgs, stream: boolean) {
-  return compactRecord([
-    ["input", args.input],
-    ["model", args.model],
-    ["stream", stream],
-    ["citation_format", args.citationFormat],
-    ["include_domains", args.includeDomains],
-    ["exclude_domains", args.excludeDomains],
-    ["output_length", args.outputLength],
   ]);
 }
 
@@ -280,18 +180,6 @@ function validateExtractArgs(args: ExtractArgs) {
   }
 }
 
-function validateResearchArgs(args: ResearchArgs) {
-  if (args.input.trim().length === 0) {
-    throw new Error("Tavily research input must be a non-empty string.");
-  }
-  if (args.includeDomains !== undefined && args.includeDomains.length > 20) {
-    throw new Error("includeDomains accepts at most 20 domains.");
-  }
-  if (args.excludeDomains !== undefined && args.excludeDomains.length > 20) {
-    throw new Error("excludeDomains accepts at most 20 domains.");
-  }
-}
-
 function buildHeaders(apiKey: string) {
   return {
     Authorization: `Bearer ${apiKey}`,
@@ -301,16 +189,14 @@ function buildHeaders(apiKey: string) {
 }
 
 async function callTavilyApi(
-  endpoint: "/search" | "/extract" | "/research",
+  endpoint: "/search" | "/extract",
   body: Record<string, unknown>,
   timeoutSeconds: number,
-  method: "POST" | "GET" = "POST",
-  pathSuffix = "",
 ) {
-  const response = await fetch(`${TAVILY_BASE_URL}${endpoint}${pathSuffix}`, {
-    method,
+  const response = await fetch(`${TAVILY_BASE_URL}${endpoint}`, {
+    method: "POST",
     headers: buildHeaders(env.TAVILY_API_KEY),
-    ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutSeconds * 1_000),
   });
 
@@ -367,22 +253,6 @@ function stringArray(value: unknown) {
 function normalizeUsage(value: unknown) {
   if (!isRecord(value) || typeof value.credits !== "number") return undefined;
   return { credits: value.credits };
-}
-
-function normalizeSources(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((source) => {
-    if (!isRecord(source) || typeof source.url !== "string") return [];
-    return [
-      {
-        url: source.url,
-        ...(optionalString(source.title) && { title: source.title as string }),
-        ...(optionalString(source.favicon) && {
-          favicon: source.favicon as string,
-        }),
-      },
-    ];
-  });
 }
 
 function normalizeSearchResponse(value: unknown, query: string) {
@@ -501,259 +371,6 @@ function normalizeExtractResponse(value: unknown) {
   };
 }
 
-function normalizeResearchStatus(value: unknown): ResearchJobResponse["status"] {
-  if (typeof value !== "string") return "pending";
-  if (
-    value === "pending" ||
-    value === "in_progress" ||
-    value === "processing" ||
-    value === "completed" ||
-    value === "failed"
-  ) {
-    return value;
-  }
-  return "pending";
-}
-
-type ResearchJobResponse = {
-  requestId: string;
-  createdAt?: string;
-  status: "pending" | "in_progress" | "processing" | "completed" | "failed";
-  input?: string;
-  model?: string;
-  responseTime?: number;
-};
-
-function normalizeResearchJobResponse(value: unknown): ResearchJobResponse {
-  if (!isRecord(value) || typeof value.request_id !== "string") {
-    throw new Error("Tavily returned an invalid research job response.");
-  }
-  return {
-    requestId: value.request_id,
-    status: normalizeResearchStatus(value.status),
-    ...(optionalString(value.created_at) && {
-      createdAt: value.created_at as string,
-    }),
-    ...(optionalString(value.input) && { input: value.input as string }),
-    ...(optionalString(value.model) && { model: value.model as string }),
-    ...(optionalNumber(value.response_time) !== undefined && {
-      responseTime: value.response_time as number,
-    }),
-  };
-}
-
-function normalizeResearchGetResponse(value: unknown) {
-  if (!isRecord(value) || typeof value.request_id !== "string") {
-    throw new Error("Tavily returned an invalid research status response.");
-  }
-
-  const content =
-    typeof value.content === "string"
-      ? value.content
-      : value.content !== undefined
-        ? JSON.stringify(value.content)
-        : undefined;
-
-  return {
-    requestId: value.request_id,
-    status: normalizeResearchStatus(value.status),
-    sources: normalizeSources(value.sources),
-    ...(optionalString(value.created_at) && {
-      createdAt: value.created_at as string,
-    }),
-    ...(content !== undefined && { content }),
-    ...(optionalNumber(value.response_time) !== undefined && {
-      responseTime: value.response_time as number,
-    }),
-    ...(optionalString(value.error) && { error: value.error as string }),
-  };
-}
-
-function contentToString(value: unknown) {
-  if (typeof value === "string") return value;
-  if (value === undefined || value === null) return undefined;
-  return JSON.stringify(value);
-}
-
-function normalizeStreamEvent(payload: unknown): ResearchStreamEvent | null {
-  if (!isRecord(payload)) return null;
-  if (payload.object === "error") {
-    return {
-      type: "error",
-      error:
-        optionalString(payload.error) ??
-        "An error occurred while streaming the research task",
-    };
-  }
-
-  const choice = Array.isArray(payload.choices) ? payload.choices[0] : undefined;
-  const delta =
-    isRecord(choice) && isRecord(choice.delta) ? choice.delta : undefined;
-  if (!delta) return null;
-
-  if (typeof delta.content === "string" || isRecord(delta.content)) {
-    const content = contentToString(delta.content);
-    if (content === undefined) return null;
-    return { type: "content", content };
-  }
-
-  if (Array.isArray(delta.sources)) {
-    return { type: "sources", sources: normalizeSources(delta.sources) };
-  }
-
-  if (isRecord(delta.tool_calls)) {
-    const toolCalls = delta.tool_calls;
-    if (toolCalls.type === "tool_call" && Array.isArray(toolCalls.tool_call)) {
-      const tool = toolCalls.tool_call[0];
-      if (!isRecord(tool)) return null;
-      return {
-        type: "tool_call",
-        ...(optionalString(tool.name) && { name: tool.name as string }),
-        ...(optionalString(tool.id) && { id: tool.id as string }),
-        ...(optionalString(tool.arguments) && {
-          arguments: tool.arguments as string,
-        }),
-        ...(Array.isArray(tool.queries) && {
-          queries: stringArray(tool.queries),
-        }),
-      };
-    }
-    if (
-      toolCalls.type === "tool_response" &&
-      Array.isArray(toolCalls.tool_response)
-    ) {
-      const tool = toolCalls.tool_response[0];
-      if (!isRecord(tool)) return null;
-      return {
-        type: "tool_response",
-        ...(optionalString(tool.name) && { name: tool.name as string }),
-        ...(optionalString(tool.id) && { id: tool.id as string }),
-        ...(optionalString(tool.arguments) && {
-          arguments: tool.arguments as string,
-        }),
-        ...(Array.isArray(tool.sources) && {
-          sources: normalizeSources(tool.sources),
-        }),
-      };
-    }
-  }
-
-  return null;
-}
-
-async function consumeResearchStream(
-  args: ResearchArgs,
-  timeoutSeconds: number,
-) {
-  const response = await fetch(`${TAVILY_BASE_URL}/research`, {
-    method: "POST",
-    headers: buildHeaders(env.TAVILY_API_KEY),
-    body: JSON.stringify(buildResearchBody(args, true)),
-    signal: AbortSignal.timeout(timeoutSeconds * 1_000),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    const parsed = text.length > 0 ? tryParseJson(text) : null;
-    throw new Error(
-      `Tavily /research failed (${response.status}): ${readErrorMessage(parsed, text)}`,
-    );
-  }
-
-  if (!response.body) {
-    throw new Error("Tavily research stream returned an empty body.");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const events: ResearchStreamEvent[] = [];
-  let content = "";
-  let sources: Array<{ url: string; title?: string; favicon?: string }> = [];
-  let model: string | undefined;
-  let requestId: string | undefined;
-
-  const handlePayload = (raw: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed === "[DONE]") return;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      return;
-    }
-    if (isRecord(parsed)) {
-      if (typeof parsed.id === "string" && requestId === undefined) {
-        requestId = parsed.id;
-      }
-      if (typeof parsed.model === "string") {
-        model = parsed.model;
-      }
-    }
-    const event = normalizeStreamEvent(parsed);
-    if (!event) return;
-    events.push(event);
-    if (event.type === "content" && event.content) {
-      content += event.content;
-    }
-    if (event.type === "sources" && event.sources) {
-      sources = event.sources;
-    }
-    if (event.type === "error") {
-      throw new Error(event.error ?? "Tavily research stream failed.");
-    }
-  };
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let separator = buffer.indexOf("\n\n");
-    while (separator !== -1) {
-      const chunk = buffer.slice(0, separator);
-      buffer = buffer.slice(separator + 2);
-
-      const dataLines = chunk
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trimStart());
-      if (dataLines.length > 0) {
-        handlePayload(dataLines.join("\n"));
-      }
-
-      separator = buffer.indexOf("\n\n");
-    }
-  }
-
-  if (buffer.trim().length > 0) {
-    const dataLines = buffer
-      .split("\n")
-      .filter((line) => line.startsWith("data:"))
-      .map((line) => line.slice(5).trimStart());
-    if (dataLines.length > 0) {
-      handlePayload(dataLines.join("\n"));
-    }
-  }
-
-  return {
-    sources,
-    events,
-    ...(content.length > 0 && { content }),
-    ...(model && { model }),
-    ...(requestId && { requestId }),
-  };
-}
-
-const researchArgsValidator = {
-  input: v.string(),
-  model: v.optional(researchModelValidator),
-  citationFormat: v.optional(citationFormatValidator),
-  includeDomains: v.optional(v.array(v.string())),
-  excludeDomains: v.optional(v.array(v.string())),
-  outputLength: v.optional(outputLengthValidator),
-};
-
 export const search = action({
   args: {
     query: v.string(),
@@ -802,67 +419,13 @@ export const extract = action({
   },
 });
 
-/** Start a research task and return a requestId for polling via getResearch. */
-export const research = action({
-  args: researchArgsValidator,
-  returns: researchJobResponseValidator,
-  handler: async (_ctx, args) => {
-    validateResearchArgs(args);
-    const response = await callTavilyApi(
-      "/research",
-      buildResearchBody(args, false),
-      60,
-    );
-    return normalizeResearchJobResponse(response);
-  },
-});
-
-/** Poll a previously started research task. */
-export const getResearch = action({
-  args: { requestId: v.string() },
-  returns: researchGetResponseValidator,
-  handler: async (_ctx, args) => {
-    if (args.requestId.trim().length === 0) {
-      throw new Error("requestId must be a non-empty string.");
-    }
-    const response = await callTavilyApi(
-      "/research",
-      {},
-      60,
-      "GET",
-      `/${encodeURIComponent(args.requestId)}`,
-    );
-    return normalizeResearchGetResponse(response);
-  },
-});
-
-/**
- * Run research with Tavily SSE streaming.
- * Consumes the stream inside the action and returns progress events plus the
- * final report. Use this when you want stream semantics without an HTTP route;
- * use research + getResearch when you prefer to poll asynchronously.
- */
-export const researchStream = action({
-  args: researchArgsValidator,
-  returns: researchStreamResponseValidator,
-  handler: async (_ctx, args) => {
-    validateResearchArgs(args);
-    return await consumeResearchStream(args, 600);
-  },
-});
-
 export const _test = {
   buildSearchBody,
   buildExtractBody,
-  buildResearchBody,
   validateSearchArgs,
   validateExtractArgs,
-  validateResearchArgs,
   buildHeaders,
   normalizeSearchResponse,
   normalizeExtractResponse,
-  normalizeResearchJobResponse,
-  normalizeResearchGetResponse,
-  normalizeStreamEvent,
   readErrorMessage,
 };

@@ -30,25 +30,4 @@ describe("TavilyClient", () => {
       urls: ["https://docs.convex.dev/components/authoring"],
     });
   });
-
-  test("researchStream delegates to the component researchStream action", async () => {
-    const client = new TavilyClient(components.tavily);
-    const runAction = vi.fn().mockResolvedValue({
-      sources: [],
-      events: [],
-    });
-
-    await client.researchStream(
-      { runAction },
-      { input: "Convex components landscape", model: "mini" },
-    );
-
-    expect(runAction).toHaveBeenCalledWith(
-      components.tavily.lib.researchStream,
-      {
-        input: "Convex components landscape",
-        model: "mini",
-      },
-    );
-  });
 });
