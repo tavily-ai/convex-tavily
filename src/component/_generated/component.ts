@@ -3,174 +3,172 @@
  * Generated `ComponentApi` utility.
  *
  * THIS CODE IS AUTOMATICALLY GENERATED.
- * Regenerate with `npx convex codegen --component-dir ./src/component`.
+ *
+ * To regenerate, run `npx convex dev`.
+ * @module
  */
 
 import type { FunctionReference } from "convex/server";
 
-type SearchDepth = "basic" | "advanced";
-type SearchTopic = "general" | "news" | "finance";
-type TimeRange = "day" | "week" | "month" | "year";
-type ResearchModel = "mini" | "pro" | "auto";
-type CitationFormat = "numbered" | "mla" | "apa" | "chicago";
-type OutputLength = "short" | "standard" | "long";
-type ResearchStatus =
-  | "pending"
-  | "in_progress"
-  | "processing"
-  | "completed"
-  | "failed";
-
-type SearchArgs = {
-  query: string;
-  searchDepth?: SearchDepth;
-  topic?: SearchTopic;
-  maxResults?: number;
-  includeImages?: boolean;
-  includeImageDescriptions?: boolean;
-  includeAnswer?: boolean | "basic" | "advanced";
-  includeRawContent?: boolean | "markdown" | "text";
-  includeDomains?: Array<string>;
-  excludeDomains?: Array<string>;
-  timeRange?: TimeRange;
-  includeFavicon?: boolean;
-  includeUsage?: boolean;
-};
-
-type SearchResponse = {
-  query: string;
-  answer?: string;
-  images: Array<{ url: string; description?: string }>;
-  results: Array<{
-    title: string;
-    url: string;
-    content: string;
-    score: number;
-    rawContent?: string;
-    publishedDate?: string;
-    favicon?: string;
-  }>;
-  responseTime?: number;
-  requestId?: string;
-  usage?: { credits: number };
-};
-
-type ExtractArgs = {
-  urls: Array<string>;
-  query?: string;
-  chunksPerSource?: number;
-  extractDepth?: "basic" | "advanced";
-  format?: "markdown" | "text";
-  includeImages?: boolean;
-  includeFavicon?: boolean;
-  includeUsage?: boolean;
-  timeout?: number;
-};
-
-type ExtractResponse = {
-  results: Array<{
-    url: string;
-    title?: string;
-    rawContent: string;
-    images: Array<string>;
-    favicon?: string;
-  }>;
-  failedResults: Array<{ url: string; error: string }>;
-  responseTime?: number;
-  requestId?: string;
-  usage?: { credits: number };
-};
-
-type ResearchArgs = {
-  input: string;
-  model?: ResearchModel;
-  citationFormat?: CitationFormat;
-  includeDomains?: Array<string>;
-  excludeDomains?: Array<string>;
-  outputLength?: OutputLength;
-};
-
-type ResearchSource = {
-  url: string;
-  title?: string;
-  favicon?: string;
-};
-
-type ResearchJobResponse = {
-  requestId: string;
-  createdAt?: string;
-  status: ResearchStatus;
-  input?: string;
-  model?: string;
-  responseTime?: number;
-};
-
-type ResearchGetResponse = {
-  requestId: string;
-  createdAt?: string;
-  status: ResearchStatus;
-  content?: string;
-  sources: Array<ResearchSource>;
-  responseTime?: number;
-  error?: string;
-};
-
-type ResearchStreamEvent = {
-  type: "tool_call" | "tool_response" | "content" | "sources" | "error";
-  name?: string;
-  id?: string;
-  arguments?: string;
-  queries?: Array<string>;
-  sources?: Array<ResearchSource>;
-  content?: string;
-  error?: string;
-};
-
-type ResearchStreamResponse = {
-  content?: string;
-  sources: Array<ResearchSource>;
-  events: Array<ResearchStreamEvent>;
-  model?: string;
-  requestId?: string;
-};
-
-/** Typed references to the functions exposed by a mounted Tavily component. */
-export type ComponentApi<Name extends string | undefined = string | undefined> = {
-  lib: {
-    search: FunctionReference<
-      "action",
-      "internal",
-      SearchArgs,
-      SearchResponse,
-      Name
-    >;
-    extract: FunctionReference<
-      "action",
-      "internal",
-      ExtractArgs,
-      ExtractResponse,
-      Name
-    >;
-    research: FunctionReference<
-      "action",
-      "internal",
-      ResearchArgs,
-      ResearchJobResponse,
-      Name
-    >;
-    getResearch: FunctionReference<
-      "action",
-      "internal",
-      { requestId: string },
-      ResearchGetResponse,
-      Name
-    >;
-    researchStream: FunctionReference<
-      "action",
-      "internal",
-      ResearchArgs,
-      ResearchStreamResponse,
-      Name
-    >;
+/**
+ * A utility for referencing a Convex component's exposed API.
+ *
+ * Useful when expecting a parameter like `components.myComponent`.
+ * Usage:
+ * ```ts
+ * async function myFunction(ctx: QueryCtx, component: ComponentApi) {
+ *   return ctx.runQuery(component.someFile.someQuery, { ...args });
+ * }
+ * ```
+ */
+export type ComponentApi<Name extends string | undefined = string | undefined> =
+  {
+    lib: {
+      extract: FunctionReference<
+        "action",
+        "internal",
+        {
+          chunksPerSource?: number;
+          extractDepth?: "basic" | "advanced";
+          format?: "markdown" | "text";
+          includeFavicon?: boolean;
+          includeImages?: boolean;
+          includeUsage?: boolean;
+          query?: string;
+          timeout?: number;
+          urls: Array<string>;
+        },
+        {
+          failedResults: Array<{ error: string; url: string }>;
+          requestId?: string;
+          responseTime?: number;
+          results: Array<{
+            favicon?: string;
+            images: Array<string>;
+            rawContent: string;
+            title?: string;
+            url: string;
+          }>;
+          usage?: { credits: number };
+        },
+        Name
+      >;
+      getResearch: FunctionReference<
+        "action",
+        "internal",
+        { requestId: string },
+        {
+          content?: string;
+          createdAt?: string;
+          error?: string;
+          requestId: string;
+          responseTime?: number;
+          sources: Array<{ favicon?: string; title?: string; url: string }>;
+          status:
+            | "pending"
+            | "in_progress"
+            | "processing"
+            | "completed"
+            | "failed";
+        },
+        Name
+      >;
+      research: FunctionReference<
+        "action",
+        "internal",
+        {
+          citationFormat?: "numbered" | "mla" | "apa" | "chicago";
+          excludeDomains?: Array<string>;
+          includeDomains?: Array<string>;
+          input: string;
+          model?: "mini" | "pro" | "auto";
+          outputLength?: "short" | "standard" | "long";
+        },
+        {
+          createdAt?: string;
+          input?: string;
+          model?: string;
+          requestId: string;
+          responseTime?: number;
+          status:
+            | "pending"
+            | "in_progress"
+            | "processing"
+            | "completed"
+            | "failed";
+        },
+        Name
+      >;
+      researchStream: FunctionReference<
+        "action",
+        "internal",
+        {
+          citationFormat?: "numbered" | "mla" | "apa" | "chicago";
+          excludeDomains?: Array<string>;
+          includeDomains?: Array<string>;
+          input: string;
+          model?: "mini" | "pro" | "auto";
+          outputLength?: "short" | "standard" | "long";
+        },
+        {
+          content?: string;
+          events: Array<{
+            arguments?: string;
+            content?: string;
+            error?: string;
+            id?: string;
+            name?: string;
+            queries?: Array<string>;
+            sources?: Array<{ favicon?: string; title?: string; url: string }>;
+            type:
+              | "tool_call"
+              | "tool_response"
+              | "content"
+              | "sources"
+              | "error";
+          }>;
+          model?: string;
+          requestId?: string;
+          sources: Array<{ favicon?: string; title?: string; url: string }>;
+        },
+        Name
+      >;
+      search: FunctionReference<
+        "action",
+        "internal",
+        {
+          excludeDomains?: Array<string>;
+          includeAnswer?: boolean | "basic" | "advanced";
+          includeDomains?: Array<string>;
+          includeFavicon?: boolean;
+          includeImageDescriptions?: boolean;
+          includeImages?: boolean;
+          includeRawContent?: boolean | "markdown" | "text";
+          includeUsage?: boolean;
+          maxResults?: number;
+          query: string;
+          searchDepth?: "basic" | "advanced";
+          timeRange?: "day" | "week" | "month" | "year";
+          topic?: "general" | "news" | "finance";
+        },
+        {
+          answer?: string;
+          images: Array<{ description?: string; url: string }>;
+          query: string;
+          requestId?: string;
+          responseTime?: number;
+          results: Array<{
+            content: string;
+            favicon?: string;
+            publishedDate?: string;
+            rawContent?: string;
+            score: number;
+            title: string;
+            url: string;
+          }>;
+          usage?: { credits: number };
+        },
+        Name
+      >;
+    };
   };
-};

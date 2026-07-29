@@ -148,4 +148,20 @@ npm run lint
 npm run typecheck
 ```
 
+### Chat example
+
+`example/` is a Vite + React chatbot that uses this component via `@convex-dev/agent` tools. From the repo root:
+
+```bash
+# set keys on the example Convex deployment
+cd example
+npx convex env set TAVILY_API_KEY tvly-...
+npx convex env set OPENAI_API_KEY sk-...
+cd ..
+
+npm run dev   # builds package + convex dev + Vite UI
+```
+
+Open http://localhost:5173 — see [example/README.md](./example/README.md).
+
 Component code generation may require a configured Convex development deployment.

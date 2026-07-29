@@ -8,7 +8,10 @@
  * @module
  */
 
+import type * as agent from "../agent.js";
+import type * as chat from "../chat.js";
 import type * as example from "../example.js";
+import type * as tools from "../tools.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +20,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agent: typeof agent;
+  chat: typeof chat;
   example: typeof example;
+  tools: typeof tools;
 }>;
 
 /**
@@ -47,5 +53,6 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
+  agent: import("@convex-dev/agent/_generated/component.js").ComponentApi<"agent">;
   tavily: import("@tavily/convex-tavily/_generated/component.js").ComponentApi<"tavily">;
 };
