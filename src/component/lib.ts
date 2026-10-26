@@ -2,9 +2,16 @@ import { v } from "convex/values";
 import { action, env } from "./_generated/server.js";
 
 const TAVILY_BASE_URL = "https://api.tavily.com";
-const CLIENT_SOURCE = "convex-tavily";
+// Identity of this integration (X-Client-Name); X-Client-Source names the access surface (direct API).
+const CLIENT_NAME = "convex-tavily";
+const CLIENT_SOURCE = "api";
 
-const searchDepthValidator = v.union(v.literal("basic"), v.literal("advanced"));
+const searchDepthValidator = v.union(
+  v.literal("basic"),
+  v.literal("advanced"),
+  v.literal("fast"),
+  v.literal("ultra-fast"),
+);
 const topicValidator = v.union(
   v.literal("general"),
   v.literal("news"),
@@ -15,6 +22,14 @@ const timeRangeValidator = v.union(
   v.literal("week"),
   v.literal("month"),
   v.literal("year"),
+  v.literal("d"),
+  v.literal("w"),
+  v.literal("m"),
+  v.literal("y"),
+);
+const includeDomainsModeValidator = v.union(
+  v.literal("restrict"),
+  v.literal("prefer"),
 );
 const answerModeValidator = v.union(
   v.boolean(),
@@ -43,8 +58,10 @@ const searchResultValidator = v.object({
   content: v.string(),
   score: v.number(),
   rawContent: v.optional(v.string()),
-  publishedDate: v.optional(v.string()),
+  // null when Tavily could not detect a date (only returned when published dates are requested).
+  publishedDate: v.optional(v.union(v.string(), v.null())),
   favicon: v.optional(v.string()),
+  images: v.optional(v.array(imageValidator)),
 });
 const searchResponseValidator = v.object({
   query: v.string(),
@@ -54,6 +71,7 @@ const searchResponseValidator = v.object({
   responseTime: v.optional(v.number()),
   requestId: v.optional(v.string()),
   usage: v.optional(usageValidator),
+  autoParameters: v.optional(v.record(v.string(), v.any())),
 });
 const extractResultValidator = v.object({
   url: v.string(),
@@ -76,7 +94,8 @@ const extractResponseValidator = v.object({
 
 type SearchArgs = {
   query: string;
-  searchDepth?: "basic" | "advanced";
+  searchDepth?: "basic" | "advanced" | "fast" | "ultra-fast";
+  chunksPerSource?: number;
   topic?: "general" | "news" | "finance";
   maxResults?: number;
   includeImages?: boolean;
@@ -85,7 +104,18 @@ type SearchArgs = {
   includeRawContent?: boolean | "markdown" | "text";
   includeDomains?: string[];
   excludeDomains?: string[];
-  timeRange?: "day" | "week" | "month" | "year";
+  timeRange?: "day" | "week" | "month" | "year" | "d" | "w" | "m" | "y";
+  startDate?: string;
+  endDate?: string;
+  includePublishedDate?: boolean;
+  filterByPublishedDate?: boolean;
+  includeDomainsMode?: "restrict" | "prefer";
+  country?: string;
+  language?: string;
+  filterByLanguage?: boolean;
+  autoParameters?: boolean;
+  exactMatch?: boolean;
+  safeSearch?: boolean;
   includeFavicon?: boolean;
   includeUsage?: boolean;
 };
@@ -110,6 +140,7 @@ function buildSearchBody(args: SearchArgs) {
   return compactRecord([
     ["query", args.query],
     ["search_depth", args.searchDepth],
+    ["chunks_per_source", args.chunksPerSource],
     ["topic", args.topic],
     ["max_results", args.maxResults],
     ["include_images", args.includeImages],
@@ -118,7 +149,18 @@ function buildSearchBody(args: SearchArgs) {
     ["include_raw_content", args.includeRawContent],
     ["include_domains", args.includeDomains],
     ["exclude_domains", args.excludeDomains],
+    ["include_domains_mode", args.includeDomainsMode],
     ["time_range", args.timeRange],
+    ["start_date", args.startDate],
+    ["end_date", args.endDate],
+    ["include_published_date", args.includePublishedDate],
+    ["filter_by_published_date", args.filterByPublishedDate],
+    ["country", args.country],
+    ["language", args.language],
+    ["filter_by_language", args.filterByLanguage],
+    ["auto_parameters", args.autoParameters],
+    ["exact_match", args.exactMatch],
+    ["safe_search", args.safeSearch],
     ["include_favicon", args.includeFavicon],
     ["include_usage", args.includeUsage],
   ]);
@@ -153,6 +195,52 @@ function validateSearchArgs(args: SearchArgs) {
   ) {
     throw new Error("maxResults must be an integer between 0 and 20.");
   }
+  if (args.chunksPerSource !== undefined) {
+    if (
+      !Number.isInteger(args.chunksPerSource) ||
+      args.chunksPerSource < 1 ||
+      args.chunksPerSource > 3
+    ) {
+      throw new Error("chunksPerSource must be an integer between 1 and 3.");
+    }
+    if (args.searchDepth === "ultra-fast") {
+      throw new Error(
+        "chunksPerSource is available for basic, advanced and fast search depths.",
+      );
+    }
+  }
+  if (
+    args.includeDomainsMode !== undefined &&
+    (args.includeDomains === undefined || args.includeDomains.length === 0)
+  ) {
+    throw new Error("includeDomainsMode requires includeDomains.");
+  }
+  if (args.filterByLanguage !== undefined && !args.language) {
+    throw new Error("filterByLanguage requires language.");
+  }
+  if (
+    args.safeSearch === true &&
+    (args.searchDepth === "fast" || args.searchDepth === "ultra-fast")
+  ) {
+    throw new Error(
+      "safeSearch is not available for fast or ultra-fast search depths.",
+    );
+  }
+  if (
+    args.country !== undefined &&
+    args.topic !== undefined &&
+    args.topic !== "general"
+  ) {
+    throw new Error("country is only available when topic is general.");
+  }
+  for (const [name, value] of [
+    ["startDate", args.startDate],
+    ["endDate", args.endDate],
+  ] as const) {
+    if (value !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new Error(`${name} must use the YYYY-MM-DD format.`);
+    }
+  }
 }
 
 function validateExtractArgs(args: ExtractArgs) {
@@ -184,6 +272,7 @@ function buildHeaders(apiKey: string) {
   return {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
+    "X-Client-Name": CLIENT_NAME,
     "X-Client-Source": CLIENT_SOURCE,
   };
 }
@@ -267,6 +356,25 @@ function normalizeUsage(value: unknown) {
   return { credits: value.credits };
 }
 
+function normalizeImages(value: unknown) {
+  return Array.isArray(value)
+    ? value.flatMap((image) => {
+        if (typeof image === "string") return [{ url: image }];
+        if (isRecord(image) && typeof image.url === "string") {
+          return [
+            {
+              url: image.url,
+              ...(optionalString(image.description) && {
+                description: image.description as string,
+              }),
+            },
+          ];
+        }
+        return [];
+      })
+    : [];
+}
+
 function normalizeSearchResponse(value: unknown, query: string) {
   if (!isRecord(value) || !Array.isArray(value.results)) {
     throw new Error("Tavily returned an invalid search response.");
@@ -290,31 +398,20 @@ function normalizeSearchResponse(value: unknown, query: string) {
       ...(optionalString(result.raw_content) && {
         rawContent: result.raw_content as string,
       }),
-      ...(optionalString(result.published_date) && {
-        publishedDate: result.published_date as string,
+      ...((typeof result.published_date === "string" ||
+        result.published_date === null) && {
+        publishedDate: result.published_date as string | null,
       }),
       ...(optionalString(result.favicon) && {
         favicon: result.favicon as string,
       }),
+      ...(Array.isArray(result.images) && {
+        images: normalizeImages(result.images),
+      }),
     };
   });
 
-  const images = Array.isArray(value.images)
-    ? value.images.flatMap((image) => {
-        if (typeof image === "string") return [{ url: image }];
-        if (isRecord(image) && typeof image.url === "string") {
-          return [
-            {
-              url: image.url,
-              ...(optionalString(image.description) && {
-                description: image.description as string,
-              }),
-            },
-          ];
-        }
-        return [];
-      })
-    : [];
+  const images = normalizeImages(value.images);
 
   return {
     query: optionalString(value.query) ?? query,
@@ -328,6 +425,9 @@ function normalizeSearchResponse(value: unknown, query: string) {
       requestId: value.request_id as string,
     }),
     ...(normalizeUsage(value.usage) && { usage: normalizeUsage(value.usage) }),
+    ...(isRecord(value.auto_parameters) && {
+      autoParameters: value.auto_parameters,
+    }),
   };
 }
 
@@ -387,6 +487,7 @@ export const search = action({
   args: {
     query: v.string(),
     searchDepth: v.optional(searchDepthValidator),
+    chunksPerSource: v.optional(v.number()),
     topic: v.optional(topicValidator),
     maxResults: v.optional(v.number()),
     includeImages: v.optional(v.boolean()),
@@ -395,7 +496,18 @@ export const search = action({
     includeRawContent: v.optional(rawContentModeValidator),
     includeDomains: v.optional(v.array(v.string())),
     excludeDomains: v.optional(v.array(v.string())),
+    includeDomainsMode: v.optional(includeDomainsModeValidator),
     timeRange: v.optional(timeRangeValidator),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    includePublishedDate: v.optional(v.boolean()),
+    filterByPublishedDate: v.optional(v.boolean()),
+    country: v.optional(v.string()),
+    language: v.optional(v.string()),
+    filterByLanguage: v.optional(v.boolean()),
+    autoParameters: v.optional(v.boolean()),
+    exactMatch: v.optional(v.boolean()),
+    safeSearch: v.optional(v.boolean()),
     includeFavicon: v.optional(v.boolean()),
     includeUsage: v.optional(v.boolean()),
   },

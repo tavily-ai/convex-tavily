@@ -57,22 +57,43 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "action",
         "internal",
         {
+          autoParameters?: boolean;
+          chunksPerSource?: number;
+          country?: string;
+          endDate?: string;
+          exactMatch?: boolean;
           excludeDomains?: Array<string>;
+          filterByLanguage?: boolean;
+          filterByPublishedDate?: boolean;
           includeAnswer?: boolean | "basic" | "advanced";
           includeDomains?: Array<string>;
+          includeDomainsMode?: "restrict" | "prefer";
           includeFavicon?: boolean;
           includeImageDescriptions?: boolean;
           includeImages?: boolean;
+          includePublishedDate?: boolean;
           includeRawContent?: boolean | "markdown" | "text";
           includeUsage?: boolean;
+          language?: string;
           maxResults?: number;
           query: string;
-          searchDepth?: "basic" | "advanced";
-          timeRange?: "day" | "week" | "month" | "year";
+          safeSearch?: boolean;
+          searchDepth?: "basic" | "advanced" | "fast" | "ultra-fast";
+          startDate?: string;
+          timeRange?:
+            | "day"
+            | "week"
+            | "month"
+            | "year"
+            | "d"
+            | "w"
+            | "m"
+            | "y";
           topic?: "general" | "news" | "finance";
         },
         {
           answer?: string;
+          autoParameters?: Record<string, any>;
           images: Array<{ description?: string; url: string }>;
           query: string;
           requestId?: string;
@@ -80,7 +101,8 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           results: Array<{
             content: string;
             favicon?: string;
-            publishedDate?: string;
+            images?: Array<{ description?: string; url: string }>;
+            publishedDate?: string | null;
             rawContent?: string;
             score: number;
             title: string;

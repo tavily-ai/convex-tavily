@@ -79,7 +79,8 @@ describe("Tavily component", () => {
     expect(_test.buildHeaders("tvly-secret")).toEqual({
       Authorization: "Bearer tvly-secret",
       "Content-Type": "application/json",
-      "X-Client-Source": "convex-tavily",
+      "X-Client-Name": "convex-tavily",
+      "X-Client-Source": "api",
     });
   });
 

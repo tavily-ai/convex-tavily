@@ -99,8 +99,10 @@ App client
 
 ## Current API
 
-- `search(ctx, args)` — Search (`basic`/`advanced` depth, `timeRange`, images/favicon/usage knobs).
+- `search(ctx, args)` — Search: `searchDepth` (`basic`, `advanced`, `fast`, `ultra-fast`), `chunksPerSource` (1-3; not with `ultra-fast`), `topic`, `maxResults`, `timeRange` / `startDate` / `endDate`, `includePublishedDate` (beta) / `filterByPublishedDate`, `includeDomains` / `excludeDomains` / `includeDomainsMode`, `country`, `language` / `filterByLanguage`, `autoParameters`, `exactMatch`, `safeSearch` (not with `fast`/`ultra-fast`), answer/raw content/images/favicon/usage options. Results keep `publishedDate` (`null` when undetected), per-result `images`, `usage`, `requestId` and `autoParameters`.
 - `extract(ctx, args)` — Extract up to 20 URLs, including query-focused chunks, images, timeout.
+
+Requests are sent with `X-Client-Name: convex-tavily` and `X-Client-Source: api`.
 
 The component is stateless and owns no database tables.
 
