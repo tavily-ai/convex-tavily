@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { action, env } from "./_generated/server.js";
 
 const TAVILY_BASE_URL = "https://api.tavily.com";
@@ -290,33 +290,31 @@ function requireApiKey(): string {
 }
 
 async function callTavilyApi(
-  endpoint: "/search" | "/extract",
-  body: Record<string, unknown>,
+  endpoint: string,
+  body: Record<string, unknown> | undefined,
   timeoutSeconds: number,
 ) {
   const response = await fetch(`${TAVILY_BASE_URL}${endpoint}`, {
-    method: "POST",
+    method: body === undefined ? "GET" : "POST",
     headers: buildHeaders(requireApiKey()),
-    body: JSON.stringify(body),
+    ...(body !== undefined && { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(timeoutSeconds * 1_000),
   });
 
   const text = await response.text();
-  const parsed = text.length > 0 ? tryParseJson(text) : null;
+  let parsed: unknown;
+  try {
+    parsed = text.length > 0 ? JSON.parse(text) : null;
+  } catch {
+    if (response.ok) throw new Error("Tavily returned a non-JSON response.");
+    parsed = null;
+  }
   if (!response.ok) {
     throw new Error(
       `Tavily ${endpoint} failed (${response.status}): ${readErrorMessage(parsed, text)}`,
     );
   }
   return parsed;
-}
-
-function tryParseJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("Tavily returned a non-JSON response.");
-  }
 }
 
 function readErrorMessage(parsed: unknown, raw: string) {
@@ -554,3 +552,328 @@ export const _test = {
   normalizeExtractResponse,
   readErrorMessage,
 };
+
+// Discovery actions share traversal controls; Crawl additionally extracts content.
+const traversalArgs = {
+  url: v.string(),
+  instructions: v.optional(v.string()),
+  maxDepth: v.optional(v.number()),
+  maxBreadth: v.optional(v.number()),
+  limit: v.optional(v.number()),
+  selectPaths: v.optional(v.array(v.string())),
+  selectDomains: v.optional(v.array(v.string())),
+  excludePaths: v.optional(v.array(v.string())),
+  excludeDomains: v.optional(v.array(v.string())),
+  allowExternal: v.optional(v.boolean()),
+  timeout: v.optional(v.number()),
+  includeUsage: v.optional(v.boolean()),
+};
+const _traversalValidator = v.object(traversalArgs);
+type TraversalArgs = Infer<typeof _traversalValidator>;
+const responseMetadata = {
+  responseTime: v.optional(v.number()),
+  requestId: v.optional(v.string()),
+  usage: v.optional(v.record(v.string(), v.any())),
+};
+
+function validateTraversal(args: TraversalArgs) {
+  if (!args.url.trim()) throw new Error("url must not be empty.");
+  for (const [name, min, max] of [
+    ["maxDepth", 1, 5],
+    ["maxBreadth", 1, 500],
+    ["limit", 1, Number.MAX_SAFE_INTEGER],
+  ] as const) {
+    const n = args[name];
+    if (n !== undefined && (!Number.isSafeInteger(n) || n < min || n > max)) {
+      throw new Error(`${name} must be an integer between ${min} and ${max}.`);
+    }
+  }
+  if (
+    args.timeout !== undefined &&
+    (!Number.isFinite(args.timeout) || args.timeout < 10 || args.timeout > 150)
+  ) {
+    throw new Error("timeout must be between 10 and 150 seconds.");
+  }
+}
+
+function traversalBody(args: TraversalArgs) {
+  return compactRecord([
+    ["url", args.url],
+    ["instructions", args.instructions],
+    ["max_depth", args.maxDepth],
+    ["max_breadth", args.maxBreadth],
+    ["limit", args.limit],
+    ["select_paths", args.selectPaths],
+    ["select_domains", args.selectDomains],
+    ["exclude_paths", args.excludePaths],
+    ["exclude_domains", args.excludeDomains],
+    ["allow_external", args.allowExternal],
+    ["timeout", args.timeout],
+    ["include_usage", args.includeUsage],
+  ]);
+}
+
+function metadata(value: Record<string, unknown>) {
+  return {
+    ...(typeof value.response_time === "number" && {
+      responseTime: value.response_time,
+    }),
+    ...(typeof value.request_id === "string" && {
+      requestId: value.request_id,
+    }),
+    ...(isRecord(value.usage) && { usage: value.usage }),
+  };
+}
+
+export const map = action({
+  args: traversalArgs,
+  returns: v.object({
+    baseUrl: v.string(),
+    results: v.array(v.string()),
+    ...responseMetadata,
+  }),
+  handler: async (_ctx, args) => {
+    validateTraversal(args);
+    // Allow the service's operation timeout plus transport overhead.
+    const value = await callTavilyApi(
+      "/map",
+      traversalBody(args),
+      (args.timeout ?? 150) + 10,
+    );
+    if (
+      !isRecord(value) ||
+      typeof value.base_url !== "string" ||
+      !Array.isArray(value.results) ||
+      !value.results.every((url) => typeof url === "string")
+    ) {
+      throw new Error("Tavily returned an invalid map response.");
+    }
+    return {
+      baseUrl: value.base_url,
+      results: value.results as string[],
+      ...metadata(value),
+    };
+  },
+});
+
+export const crawl = action({
+  args: {
+    ...traversalArgs,
+    chunksPerSource: v.optional(v.number()),
+    extractDepth: v.optional(extractDepthValidator),
+    format: v.optional(formatValidator),
+    includeImages: v.optional(v.boolean()),
+    includeFavicon: v.optional(v.boolean()),
+  },
+  returns: v.object({
+    baseUrl: v.string(),
+    results: v.array(extractResultValidator),
+    failedResults: v.optional(v.array(extractFailureValidator)),
+    ...responseMetadata,
+  }),
+  handler: async (_ctx, args) => {
+    validateTraversal(args);
+    if (args.chunksPerSource !== undefined) {
+      if (!args.instructions?.trim())
+        throw new Error("Crawl chunksPerSource requires instructions.");
+      if (
+        !Number.isInteger(args.chunksPerSource) ||
+        args.chunksPerSource < 1 ||
+        args.chunksPerSource > 5
+      ) {
+        throw new Error(
+          "Crawl chunksPerSource must be an integer between 1 and 5.",
+        );
+      }
+    }
+    const value = await callTavilyApi(
+      "/crawl",
+      {
+        ...traversalBody(args),
+        ...compactRecord([
+          ["chunks_per_source", args.chunksPerSource],
+          ["extract_depth", args.extractDepth],
+          ["format", args.format],
+          ["include_images", args.includeImages],
+          ["include_favicon", args.includeFavicon],
+        ]),
+      },
+      (args.timeout ?? 150) + 10,
+    );
+    if (!isRecord(value) || typeof value.base_url !== "string")
+      throw new Error("Tavily returned an invalid crawl response.");
+    const extracted = normalizeExtractResponse({
+      ...value,
+      failed_results: value.failed_results ?? [],
+    });
+    return {
+      baseUrl: value.base_url,
+      results: extracted.results,
+      ...metadata(value),
+      ...(value.failed_results !== undefined && {
+        failedResults: extracted.failedResults,
+      }),
+    };
+  },
+});
+
+const researchArgs = {
+  input: v.string(),
+  model: v.optional(
+    v.union(v.literal("mini"), v.literal("pro"), v.literal("auto")),
+  ),
+  outputSchema: v.optional(v.record(v.string(), v.any())),
+  citationFormat: v.optional(
+    v.union(
+      v.literal("numbered"),
+      v.literal("mla"),
+      v.literal("apa"),
+      v.literal("chicago"),
+    ),
+  ),
+  includeDomains: v.optional(v.array(v.string())),
+  excludeDomains: v.optional(v.array(v.string())),
+  outputLength: v.optional(
+    v.union(v.literal("short"), v.literal("standard"), v.literal("long")),
+  ),
+  files: v.optional(
+    v.array(
+      v.object({
+        name: v.string(),
+        data: v.string(),
+        type: v.optional(v.literal("base64")),
+      }),
+    ),
+  ),
+};
+const _researchArgsValidator = v.object(researchArgs);
+const researchResponseValidator = v.object({
+  ...responseMetadata,
+  requestId: v.string(),
+  status: v.union(
+    v.literal("pending"),
+    v.literal("in_progress"),
+    v.literal("completed"),
+    v.literal("failed"),
+  ),
+  createdAt: v.optional(v.string()),
+  input: v.optional(v.string()),
+  model: v.optional(v.string()),
+  content: v.optional(v.union(v.string(), v.record(v.string(), v.any()))),
+  // Keep source metadata intact, including file citations without a web URL.
+  sources: v.optional(v.array(v.record(v.string(), v.any()))),
+  error: v.optional(v.any()),
+});
+
+function validateResearch(args: Infer<typeof _researchArgsValidator>) {
+  if (!args.input.trim()) throw new Error("Research input must not be empty.");
+  for (const name of ["includeDomains", "excludeDomains"] as const) {
+    if ((args[name]?.length ?? 0) > 20)
+      throw new Error(`${name} accepts at most 20 domains.`);
+  }
+  if (
+    args.outputSchema !== undefined &&
+    !isRecord(args.outputSchema.properties)
+  ) {
+    throw new Error("outputSchema must contain a properties object.");
+  }
+  if ((args.files?.length ?? 0) > 5)
+    throw new Error("Research accepts at most 5 files.");
+  let words = 0;
+  for (const file of args.files ?? []) {
+    if (!/\.(txt|md|json)$/i.test(file.name))
+      throw new Error("Research files must use .txt, .md or .json.");
+    let text: string;
+    try {
+      const bytes = Uint8Array.from(atob(file.data), (c) => c.charCodeAt(0));
+      text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      throw new Error("Research file data must be base64-encoded UTF-8 text.");
+    }
+    words += text.trim() ? text.trim().split(/\s+/u).length : 0;
+  }
+  if (words > 80_000)
+    throw new Error(
+      "Research files must contain at most 80000 words combined.",
+    );
+}
+
+function normalizeResearch(
+  value: unknown,
+): Infer<typeof researchResponseValidator> {
+  if (
+    !isRecord(value) ||
+    typeof value.request_id !== "string" ||
+    !["pending", "in_progress", "completed", "failed"].includes(
+      String(value.status),
+    )
+  ) {
+    throw new Error("Tavily returned an invalid research response.");
+  }
+  if (
+    value.status === "completed" &&
+    ((typeof value.content !== "string" && !isRecord(value.content)) ||
+      !Array.isArray(value.sources) ||
+      !value.sources.every(isRecord))
+  ) {
+    throw new Error("Tavily returned an invalid research result.");
+  }
+  return {
+    ...metadata(value),
+    requestId: value.request_id,
+    status: value.status as Infer<typeof researchResponseValidator>["status"],
+    ...(typeof value.created_at === "string" && {
+      createdAt: value.created_at,
+    }),
+    ...(typeof value.input === "string" && { input: value.input }),
+    ...(typeof value.model === "string" && { model: value.model }),
+    ...((typeof value.content === "string" || isRecord(value.content)) && {
+      content: value.content,
+    }),
+    ...(Array.isArray(value.sources) && {
+      sources: value.sources as Record<string, unknown>[],
+    }),
+    ...(value.error !== undefined && { error: value.error }),
+  };
+}
+
+/** Submit once. Persist requestId in the app and read completion in a later action. */
+export const research = action({
+  args: researchArgs,
+  returns: researchResponseValidator,
+  handler: async (_ctx, args) => {
+    validateResearch(args);
+    const response = await callTavilyApi(
+      "/research",
+      compactRecord([
+        ["input", args.input],
+        ["model", args.model],
+        ["stream", false],
+        ["output_schema", args.outputSchema],
+        ["citation_format", args.citationFormat],
+        ["include_domains", args.includeDomains],
+        ["exclude_domains", args.excludeDomains],
+        ["output_length", args.outputLength],
+        ["files", args.files],
+      ]),
+      60,
+    );
+    return normalizeResearch(response);
+  },
+});
+
+/** Read task status; completed responses contain the full report and sources. */
+export const getResearch = action({
+  args: { requestId: v.string() },
+  returns: researchResponseValidator,
+  handler: async (_ctx, args) => {
+    if (!args.requestId.trim()) throw new Error("requestId must not be empty.");
+    return normalizeResearch(
+      await callTavilyApi(
+        `/research/${encodeURIComponent(args.requestId)}`,
+        undefined,
+        60,
+      ),
+    );
+  },
+});
