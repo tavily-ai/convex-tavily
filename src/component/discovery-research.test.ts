@@ -368,3 +368,26 @@ test("request cancellation propagates and is not retried", async () => {
   ).rejects.toThrow(/Timed out/);
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+
+test.each([undefined, false, true])(
+  "Research usage query preserves omission/false/true: %s",
+  async (includeUsage) => {
+    const fetch = respond({
+      request_id: "id",
+      status: "in_progress",
+      usage: { credits: 0 },
+    });
+    const args = {
+      requestId: "id",
+      ...(includeUsage !== undefined && { includeUsage }),
+    };
+    const result = await convexTest(schema, modules).action(
+      api.lib.getResearch,
+      args,
+    );
+    expect(fetch.mock.calls[0]![0]).toBe(
+      `https://api.tavily.com/research/id${includeUsage === undefined ? "" : `?include_usage=${includeUsage}`}`,
+    );
+    expect(result.usage).toEqual({ credits: 0 });
+  },
+);

@@ -132,6 +132,9 @@ export const startResearch = createTool({
 export const readResearch = createTool({
   description:
     "Read a previously submitted Research task. Returns pending/in_progress, or the full completed report and sources, or failed. If still pending, report that and stop rather than polling repeatedly in one turn.",
-  inputSchema: z.object({ requestId: z.string() }),
+  inputSchema: z.object({
+    requestId: z.string(),
+    includeUsage: z.boolean().optional(),
+  }),
   execute: async (ctx, args) => tavily.getResearch(ctx, args),
 });

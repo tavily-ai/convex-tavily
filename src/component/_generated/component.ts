@@ -94,7 +94,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       getResearch: FunctionReference<
         "action",
         "internal",
-        { requestId: string },
+        { requestId: string; includeUsage?: boolean },
         {
           responseTime?: number;
           requestId: string;

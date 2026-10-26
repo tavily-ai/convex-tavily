@@ -161,13 +161,13 @@ export const startResearch = action({
 });
 
 export const readResearch = action({
-  args: { requestId: v.string() },
+  args: { requestId: v.string(), includeUsage: v.optional(v.boolean()) },
   handler: async (ctx, args) => tavily.getResearch(ctx, args),
 });
 ```
 
 `research` accepts HTTP 201 and returns a task rather than claiming completion.
-`getResearch` returns `pending`, `in_progress`, `completed`, or `failed`. A
+`getResearch` accepts optional `includeUsage` to request credit metadata; omission uses the server default and explicit `false` is preserved. It returns `pending`, `in_progress`, `completed`, or `failed`. A
 completed response includes `content` (report text or a structured object) and
 `sources`; sources retain their metadata, including file citations. Responses
 also retain returned `createdAt`, `model`, `input`, `responseTime`, `usage`, and
@@ -203,7 +203,7 @@ App client
 - `map(ctx, args)` — Discover URLs with traversal, path/domain controls and usage.
 - `crawl(ctx, args)` — Discover and extract content with traversal and extraction controls.
 - `research(ctx, args)` — Submit a Research task with model, domains, structured output, citation format and files.
-- `getResearch(ctx, { requestId })` — Read status and the complete report/sources when ready.
+- `getResearch(ctx, { requestId, includeUsage })` — Read status and the complete report/sources when ready.
 
 Requests are sent with `X-Client-Name: convex-tavily` and `X-Client-Source: api`.
 

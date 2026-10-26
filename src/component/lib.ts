@@ -864,13 +864,13 @@ export const research = action({
 
 /** Read task status; completed responses contain the full report and sources. */
 export const getResearch = action({
-  args: { requestId: v.string() },
+  args: { requestId: v.string(), includeUsage: v.optional(v.boolean()) },
   returns: researchResponseValidator,
   handler: async (_ctx, args) => {
     if (!args.requestId.trim()) throw new Error("requestId must not be empty.");
     return normalizeResearch(
       await callTavilyApi(
-        `/research/${encodeURIComponent(args.requestId)}`,
+        `/research/${encodeURIComponent(args.requestId)}${args.includeUsage === undefined ? "" : `?include_usage=${args.includeUsage}`}`,
         undefined,
         60,
       ),
