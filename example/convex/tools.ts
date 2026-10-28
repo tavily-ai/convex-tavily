@@ -1,6 +1,7 @@
 import { createTool } from "@convex-dev/agent";
 import { z } from "zod";
 import {
+  tavily,
   extractPages as runExtract,
   searchWeb as runSearch,
 } from "./tavily.js";
@@ -59,4 +60,26 @@ export const extractPages = createTool({
       failedResults: response.failedResults,
     };
   },
+});
+
+// Keep traversal budgets in application code, not model arguments.
+const discoveryInputs = z.object({
+  url: z.string().describe("Website to explore"),
+  instructions: z.string().optional().describe("What pages or content to find"),
+});
+
+export const mapWebsite = createTool({
+  description: "Discover up to 10 URLs on a website to choose pages for extraction.",
+  inputSchema: discoveryInputs,
+  execute: async (ctx, { url, instructions }) => tavily.map(ctx, {
+    url, instructions, maxDepth: 1, limit: 10, allowExternal: false,
+  }),
+});
+
+export const crawlWebsite = createTool({
+  description: "Discover and extract up to 3 pages from a website.",
+  inputSchema: discoveryInputs,
+  execute: async (ctx, { url, instructions }) => tavily.crawl(ctx, {
+    url, instructions, maxDepth: 1, limit: 3, allowExternal: false,
+  }),
 });

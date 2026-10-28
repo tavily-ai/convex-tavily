@@ -24,32 +24,96 @@ import type { FunctionReference } from "convex/server";
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
     lib: {
+      crawl: FunctionReference<
+        "action",
+        "internal",
+        {
+          url: string;
+          instructions?: string;
+          maxDepth?: number;
+          maxBreadth?: number;
+          limit?: number;
+          selectPaths?: Array<string>;
+          selectDomains?: Array<string>;
+          excludePaths?: Array<string>;
+          excludeDomains?: Array<string>;
+          allowExternal?: boolean;
+          timeout?: number;
+          includeUsage?: boolean;
+          chunksPerSource?: number;
+          extractDepth?: "basic" | "advanced";
+          format?: "markdown" | "text";
+          includeImages?: boolean;
+          includeFavicon?: boolean;
+        },
+        {
+          baseUrl: string;
+          results: Array<{
+            url: string;
+            title?: string;
+            rawContent: string;
+            images: Array<string>;
+            favicon?: string;
+          }>;
+          failedResults?: Array<{ url: string; error: string }>;
+          responseTime?: number;
+          requestId?: string;
+          usage?: Record<string, any>;
+        },
+        Name
+      >;
       extract: FunctionReference<
         "action",
         "internal",
         {
+          urls: Array<string>;
+          query?: string;
           chunksPerSource?: number;
           extractDepth?: "basic" | "advanced";
           format?: "markdown" | "text";
-          includeFavicon?: boolean;
           includeImages?: boolean;
+          includeFavicon?: boolean;
           includeUsage?: boolean;
-          query?: string;
           timeout?: number;
-          urls: Array<string>;
         },
         {
-          failedResults: Array<{ error: string; url: string }>;
-          requestId?: string;
-          responseTime?: number;
           results: Array<{
-            favicon?: string;
-            images: Array<string>;
-            rawContent: string;
-            title?: string;
             url: string;
+            title?: string;
+            rawContent: string;
+            images: Array<string>;
+            favicon?: string;
           }>;
+          failedResults: Array<{ url: string; error: string }>;
+          responseTime?: number;
+          requestId?: string;
           usage?: { credits: number };
+        },
+        Name
+      >;
+      map: FunctionReference<
+        "action",
+        "internal",
+        {
+          url: string;
+          instructions?: string;
+          maxDepth?: number;
+          maxBreadth?: number;
+          limit?: number;
+          selectPaths?: Array<string>;
+          selectDomains?: Array<string>;
+          excludePaths?: Array<string>;
+          excludeDomains?: Array<string>;
+          allowExternal?: boolean;
+          timeout?: number;
+          includeUsage?: boolean;
+        },
+        {
+          baseUrl: string;
+          results: Array<string>;
+          responseTime?: number;
+          requestId?: string;
+          usage?: Record<string, any>;
         },
         Name
       >;
@@ -57,36 +121,50 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "action",
         "internal",
         {
-          excludeDomains?: Array<string>;
-          includeAnswer?: boolean | "basic" | "advanced";
-          includeDomains?: Array<string>;
-          includeFavicon?: boolean;
-          includeImageDescriptions?: boolean;
-          includeImages?: boolean;
-          includeRawContent?: boolean | "markdown" | "text";
-          includeUsage?: boolean;
-          maxResults?: number;
           query: string;
-          searchDepth?: "basic" | "advanced";
-          timeRange?: "day" | "week" | "month" | "year";
+          searchDepth?: "basic" | "advanced" | "fast" | "ultra-fast";
+          chunksPerSource?: number;
           topic?: "general" | "news" | "finance";
+          maxResults?: number;
+          includeImages?: boolean;
+          includeImageDescriptions?: boolean;
+          includeAnswer?: boolean | "basic" | "advanced";
+          includeRawContent?: boolean | "markdown" | "text";
+          includeDomains?: Array<string>;
+          excludeDomains?: Array<string>;
+          includeDomainsMode?: "restrict" | "prefer";
+          timeRange?: "day" | "week" | "month" | "year" | "d" | "w" | "m" | "y";
+          startDate?: string;
+          endDate?: string;
+          includePublishedDate?: boolean;
+          filterByPublishedDate?: boolean;
+          country?: string;
+          language?: string;
+          filterByLanguage?: boolean;
+          autoParameters?: boolean;
+          exactMatch?: boolean;
+          safeSearch?: boolean;
+          includeFavicon?: boolean;
+          includeUsage?: boolean;
         },
         {
-          answer?: string;
-          images: Array<{ description?: string; url: string }>;
           query: string;
-          requestId?: string;
-          responseTime?: number;
+          answer?: string;
+          images: Array<{ url: string; description?: string }>;
           results: Array<{
-            content: string;
-            favicon?: string;
-            publishedDate?: string;
-            rawContent?: string;
-            score: number;
             title: string;
             url: string;
+            content: string;
+            score: number;
+            rawContent?: string;
+            publishedDate?: string | null;
+            favicon?: string;
+            images?: Array<{ url: string; description?: string }>;
           }>;
+          responseTime?: number;
+          requestId?: string;
           usage?: { credits: number };
+          autoParameters?: Record<string, any>;
         },
         Name
       >;
