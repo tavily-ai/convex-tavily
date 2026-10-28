@@ -1,7 +1,7 @@
 {
   "name": "@tavily/convex-tavily",
   "version": "0.1.0",
-  "description": "Tavily Search, Extract, Map, Crawl, and Research for Convex applications",
+  "description": "Tavily Search, Extract, Map, and Crawl for Convex applications",
   "type": "module",
   "license": "Apache-2.0",
   "sideEffects": false,

@@ -1,17 +1,10 @@
 import { Agent, stepCountIs } from "@convex-dev/agent";
 import { openai } from "@ai-sdk/openai";
 import { components } from "./_generated/api.js";
-import {
-  extractPages,
-  webSearch,
-  mapWebsite,
-  crawlWebsite,
-  startResearch,
-  readResearch,
-} from "./tools.js";
+import { extractPages, webSearch, mapWebsite, crawlWebsite } from "./tools.js";
 
 /**
- * Demo assistant backed by Tavily Search, Extract, Map, Crawl, and Research.
+ * Demo assistant backed by Tavily Search, Extract, Map and Crawl tools.
  * Requires OPENAI_API_KEY on the Convex deployment (process.env).
  */
 export const researchAgent = new Agent(components.agent, {
@@ -29,18 +22,9 @@ export const researchAgent = new Agent(components.agent, {
     "Use webSearch for facts, news, docs lookups, or anything time-sensitive.",
     "Use extractPages when you already have URLs and need fuller page content.",
     "Use mapWebsite to discover URLs and crawlWebsite to collect focused website content.",
-    "For longer reports, submit startResearch once and retain its requestId. Use readResearch later; if pending, tell the user and stop polling this turn.",
-    "Only report Research as complete when its status is completed; preserve its source citations.",
     "Always cite sources with titles and links from your tools.",
     "Be concise and grounded — do not invent URLs or facts.",
   ].join(" "),
-  tools: {
-    webSearch,
-    extractPages,
-    mapWebsite,
-    crawlWebsite,
-    startResearch,
-    readResearch,
-  },
+  tools: { webSearch, extractPages, mapWebsite, crawlWebsite },
   stopWhen: stepCountIs(6),
 });

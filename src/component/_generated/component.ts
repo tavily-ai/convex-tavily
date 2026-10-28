@@ -91,24 +91,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         },
         Name
       >;
-      getResearch: FunctionReference<
-        "action",
-        "internal",
-        { requestId: string; includeUsage?: boolean },
-        {
-          responseTime?: number;
-          requestId: string;
-          usage?: Record<string, any>;
-          status: "pending" | "in_progress" | "completed" | "failed";
-          createdAt?: string;
-          input?: string;
-          model?: string;
-          content?: string | Record<string, any>;
-          sources?: Array<Record<string, any>>;
-          error?: any;
-        },
-        Name
-      >;
       map: FunctionReference<
         "action",
         "internal",
@@ -132,33 +114,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           responseTime?: number;
           requestId?: string;
           usage?: Record<string, any>;
-        },
-        Name
-      >;
-      research: FunctionReference<
-        "action",
-        "internal",
-        {
-          input: string;
-          model?: "mini" | "pro" | "auto";
-          outputSchema?: Record<string, any>;
-          citationFormat?: "numbered" | "mla" | "apa" | "chicago";
-          includeDomains?: Array<string>;
-          excludeDomains?: Array<string>;
-          outputLength?: "short" | "standard" | "long";
-          files?: Array<{ name: string; data: string; type?: "base64" }>;
-        },
-        {
-          responseTime?: number;
-          requestId: string;
-          usage?: Record<string, any>;
-          status: "pending" | "in_progress" | "completed" | "failed";
-          createdAt?: string;
-          input?: string;
-          model?: string;
-          content?: string | Record<string, any>;
-          sources?: Array<Record<string, any>>;
-          error?: any;
         },
         Name
       >;

@@ -11,7 +11,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-test("typed client crosses real component registration for discovery and Research lifecycle", async () => {
+test("typed client crosses real component registration for Map and Crawl", async () => {
   const t = convexTest(defineSchema({}), import.meta.glob("./_generated/*.ts"));
   register(t);
   const client = new TavilyClient(components.tavily);
@@ -22,19 +22,11 @@ test("typed client crosses real component registration for discovery and Researc
       base_url: "example.com",
       results: [{ url: "https://example.com/page", raw_content: "page" }],
     },
-    { request_id: "task", status: "pending" },
-    { request_id: "task", status: "in_progress" },
-    {
-      request_id: "task",
-      status: "completed",
-      content: "Report [1]",
-      sources: [{ title: "page", url: "https://example.com/page" }],
-    },
   ];
   const fetch = vi.fn().mockImplementation(
     async () =>
       new Response(JSON.stringify(responses.shift()), {
-        status: responses.length === 2 ? 201 : 200,
+        status: 200,
       }),
   );
   vi.stubGlobal("fetch", fetch);
@@ -43,24 +35,6 @@ test("typed client crosses real component registration for discovery and Researc
     expect(mapped.results).toEqual(["https://example.com/page"]);
     const crawled = await client.crawl(ctx, { url: mapped.results[0]! });
     expect(crawled.results[0]?.rawContent).toBe("page");
-    const created = await client.research(ctx, {
-      input: "Compare this page",
-      model: "mini",
-    });
-    expect(created.status).toBe("pending");
-    expect(fetch).toHaveBeenCalledTimes(3);
-    const pending = await client.getResearch(ctx, {
-      requestId: created.requestId,
-    });
-    expect(pending.status).toBe("in_progress");
-    expect(pending.content).toBeUndefined();
-    const completed = await client.getResearch(ctx, {
-      requestId: created.requestId,
-    });
-    expect(completed.content).toBe("Report [1]");
-    expect(completed.sources).toEqual([
-      { title: "page", url: "https://example.com/page" },
-    ]);
-    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

@@ -162,121 +162,13 @@ describe("discovery actions", () => {
   });
 });
 
-describe("Research task lifecycle", () => {
-  test("submits every control as JSON and returns HTTP201 task without polling", async () => {
-    const fetch = respond(
-      {
-        request_id: "task-1",
-        status: "pending",
-        created_at: "date",
-        input: "Compare",
-        model: "pro",
-        response_time: 0.1,
-      },
-      201,
-    );
-    const outputSchema = {
-      properties: { summary: { type: "string", description: "Summary" } },
-      required: ["summary"],
-    };
-    const files = [
-      { name: "brief.md", data: "aGVsbG8=", type: "base64" as const },
-    ];
-    const out = await convexTest(schema, modules).action(api.lib.research, {
-      input: "Compare",
-      model: "pro",
-      outputSchema,
-      citationFormat: "apa",
-      includeDomains: ["example.com"],
-      excludeDomains: ["other.com"],
-      outputLength: "long",
-      files,
-    });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual({
-      input: "Compare",
-      model: "pro",
-      stream: false,
-      output_schema: outputSchema,
-      citation_format: "apa",
-      include_domains: ["example.com"],
-      exclude_domains: ["other.com"],
-      output_length: "long",
-      files,
-    });
-    expect(out).toEqual({
-      requestId: "task-1",
-      status: "pending",
-      createdAt: "date",
-      input: "Compare",
-      model: "pro",
-      responseTime: 0.1,
-    });
-  });
-  test.each(["pending", "in_progress", "completed", "failed"])(
-    "reads %s without inventing completion or dropping structured content/sources",
-    async (status) => {
-      const completed = {
-        content: { summary: "Report [1]", nested: { count: 0 } },
-        sources: [
-          { title: "source", url: "https://example.com", favicon: "icon" },
-          { title: "brief.md", type: "file", file_name: "brief.md" },
-        ],
-      };
-      const extras =
-        status === "completed"
-          ? completed
-          : status === "failed"
-            ? { error: { message: "Task failed" } }
-            : {};
-      const fetch = respond({
-        request_id: "task/1?",
-        status,
-        ...extras,
-        usage: { credits: 0 },
-        response_time: 0,
-      });
-      const out = await convexTest(schema, modules).action(
-        api.lib.getResearch,
-        { requestId: "task/1?" },
-      );
-      expect(fetch.mock.calls[0]![0]).toBe(
-        "https://api.tavily.com/research/task%2F1%3F",
-      );
-      expect(fetch.mock.calls[0]![1].method).toBe("GET");
-      expect(fetch.mock.calls[0]![1].body).toBeUndefined();
-      expect(out).toEqual({
-        requestId: "task/1?",
-        status,
-        ...extras,
-        usage: { credits: 0 },
-        responseTime: 0,
-      });
-    },
-  );
-  test.each([
-    { input: " " },
-    { input: "q", includeDomains: Array(21).fill("x") },
-    { input: "q", files: Array(6).fill({ name: "a.md", data: "" }) },
-    { input: "q", files: [{ name: "a.pdf", data: "YQ==" }] },
-    { input: "q", files: [{ name: "a.md", data: "%%%" }] },
-    { input: "q", outputSchema: {} },
-  ])("rejects invalid Research input before HTTP: %j", async (args) => {
-    const fetch = respond({});
-    await expect(
-      convexTest(schema, modules).action(api.lib.research, args),
-    ).rejects.toThrow();
-    expect(fetch).not.toHaveBeenCalled();
-  });
-});
-
 describe("API failures", () => {
   test.each([400, 401, 429, 432, 500])(
     "retains HTTP %s and structured error detail",
     async (status) => {
       respond({ detail: { error: "request rejected" } }, status);
       await expect(
-        convexTest(schema, modules).action(api.lib.research, { input: "q" }),
+        convexTest(schema, modules).action(api.lib.map, { url: "example.com" }),
       ).rejects.toThrow(`(${status}): request rejected`);
     },
   );
@@ -294,65 +186,13 @@ describe("API failures", () => {
     ).rejects.toThrow(/503.*upstream unavailable/);
   });
   test("rejects malformed successful responses", async () => {
-    respond({ status: "completed", request_id: "x" });
+    respond({ base_url: "example.com", results: [42] });
     await expect(
-      convexTest(schema, modules).action(api.lib.getResearch, {
-        requestId: "x",
+      convexTest(schema, modules).action(api.lib.map, {
+        url: "example.com",
       }),
-    ).rejects.toThrow(/invalid research/);
+    ).rejects.toThrow(/invalid map/);
   });
-});
-
-test("Research enforces combined file words without making a request", async () => {
-  const fetch = respond({});
-  const data = btoa("word ".repeat(40001));
-  await expect(
-    convexTest(schema, modules).action(api.lib.research, {
-      input: "q",
-      files: [
-        { name: "one.md", data },
-        { name: "two.txt", data },
-      ],
-    }),
-  ).rejects.toThrow(/80000 words combined/);
-  expect(fetch).not.toHaveBeenCalled();
-});
-
-test("Research accepts all model choices and unstructured report text", async () => {
-  for (const model of ["mini", "pro", "auto"] as const) {
-    const fetch = respond({ request_id: "id", status: "pending" }, 201);
-    await convexTest(schema, modules).action(api.lib.research, {
-      input: "q",
-      model,
-    });
-    expect(JSON.parse(fetch.mock.calls[0]![1].body)).toEqual({
-      input: "q",
-      model,
-      stream: false,
-    });
-  }
-  respond({
-    request_id: "id",
-    status: "completed",
-    content: "Report [1]",
-    sources: [{ url: "https://example.com", title: "Citation" }],
-  });
-  const out = await convexTest(schema, modules).action(api.lib.getResearch, {
-    requestId: "id",
-  });
-  expect(out.content).toBe("Report [1]");
-});
-
-test("Research rejects an invalid model at the Convex boundary", async () => {
-  const fetch = respond({});
-  await expect(
-    convexTest(schema, modules).action(api.lib.research, {
-      input: "q",
-      // @ts-expect-error Exercise the actual runtime validator too.
-      model: "unsupported",
-    }),
-  ).rejects.toThrow(/Validator/);
-  expect(fetch).not.toHaveBeenCalled();
 });
 
 test("request cancellation propagates and is not retried", async () => {
@@ -368,26 +208,3 @@ test("request cancellation propagates and is not retried", async () => {
   ).rejects.toThrow(/Timed out/);
   expect(fetch).toHaveBeenCalledTimes(1);
 });
-
-test.each([undefined, false, true])(
-  "Research usage query preserves omission/false/true: %s",
-  async (includeUsage) => {
-    const fetch = respond({
-      request_id: "id",
-      status: "in_progress",
-      usage: { credits: 0 },
-    });
-    const args = {
-      requestId: "id",
-      ...(includeUsage !== undefined && { includeUsage }),
-    };
-    const result = await convexTest(schema, modules).action(
-      api.lib.getResearch,
-      args,
-    );
-    expect(fetch.mock.calls[0]![0]).toBe(
-      `https://api.tavily.com/research/id${includeUsage === undefined ? "" : `?include_usage=${includeUsage}`}`,
-    );
-    expect(result.usage).toEqual({ credits: 0 });
-  },
-);

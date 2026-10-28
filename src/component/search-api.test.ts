@@ -223,3 +223,19 @@ describe("extract action request and response", () => {
     expect(out.requestId).toBe("req-2");
   });
 });
+
+test("explicit false language filter is forwarded without requiring a language", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValue(
+      new Response(JSON.stringify({ query: "docs", results: [] })),
+    );
+  vi.stubGlobal("fetch", fetchMock);
+  vi.stubEnv("TAVILY_API_KEY", "offline-key");
+  const t = convexTest(schema, modules);
+  await t.action(api.lib.search, { query: "docs", filterByLanguage: false });
+  expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({
+    query: "docs",
+    filter_by_language: false,
+  });
+});

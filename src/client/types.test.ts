@@ -23,16 +23,6 @@ test("exported component types match the actual action validators", () => {
   expectTypeOf<Args<"crawl">>().toEqualTypeOf<ActualArgs<"crawl">>();
   expectTypeOf<Returns<"crawl">>().toExtend<ActualReturns<"crawl">>();
   expectTypeOf<ActualReturns<"crawl">>().toExtend<Returns<"crawl">>();
-  expectTypeOf<Args<"research">>().toEqualTypeOf<ActualArgs<"research">>();
-  expectTypeOf<Returns<"research">>().toEqualTypeOf<
-    ActualReturns<"research">
-  >();
-  expectTypeOf<Args<"getResearch">>().toEqualTypeOf<
-    ActualArgs<"getResearch">
-  >();
-  expectTypeOf<Returns<"getResearch">>().toEqualTypeOf<
-    ActualReturns<"getResearch">
-  >();
   expectTypeOf<Args<"search">>().toEqualTypeOf<ActualArgs<"search">>();
   expectTypeOf<Returns<"search">>().toExtend<ActualReturns<"search">>();
   expectTypeOf<ActualReturns<"search">>().toExtend<Returns<"search">>();

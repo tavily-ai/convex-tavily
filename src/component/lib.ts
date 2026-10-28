@@ -92,45 +92,47 @@ const extractResponseValidator = v.object({
   usage: v.optional(usageValidator),
 });
 
-type SearchArgs = {
-  query: string;
-  searchDepth?: "basic" | "advanced" | "fast" | "ultra-fast";
-  chunksPerSource?: number;
-  topic?: "general" | "news" | "finance";
-  maxResults?: number;
-  includeImages?: boolean;
-  includeImageDescriptions?: boolean;
-  includeAnswer?: boolean | "basic" | "advanced";
-  includeRawContent?: boolean | "markdown" | "text";
-  includeDomains?: string[];
-  excludeDomains?: string[];
-  timeRange?: "day" | "week" | "month" | "year" | "d" | "w" | "m" | "y";
-  startDate?: string;
-  endDate?: string;
-  includePublishedDate?: boolean;
-  filterByPublishedDate?: boolean;
-  includeDomainsMode?: "restrict" | "prefer";
-  country?: string;
-  language?: string;
-  filterByLanguage?: boolean;
-  autoParameters?: boolean;
-  exactMatch?: boolean;
-  safeSearch?: boolean;
-  includeFavicon?: boolean;
-  includeUsage?: boolean;
-};
+const searchArgsValidator = v.object({
+  query: v.string(),
+  searchDepth: v.optional(searchDepthValidator),
+  chunksPerSource: v.optional(v.number()),
+  topic: v.optional(topicValidator),
+  maxResults: v.optional(v.number()),
+  includeImages: v.optional(v.boolean()),
+  includeImageDescriptions: v.optional(v.boolean()),
+  includeAnswer: v.optional(answerModeValidator),
+  includeRawContent: v.optional(rawContentModeValidator),
+  includeDomains: v.optional(v.array(v.string())),
+  excludeDomains: v.optional(v.array(v.string())),
+  includeDomainsMode: v.optional(includeDomainsModeValidator),
+  timeRange: v.optional(timeRangeValidator),
+  startDate: v.optional(v.string()),
+  endDate: v.optional(v.string()),
+  includePublishedDate: v.optional(v.boolean()),
+  filterByPublishedDate: v.optional(v.boolean()),
+  country: v.optional(v.string()),
+  language: v.optional(v.string()),
+  filterByLanguage: v.optional(v.boolean()),
+  autoParameters: v.optional(v.boolean()),
+  exactMatch: v.optional(v.boolean()),
+  safeSearch: v.optional(v.boolean()),
+  includeFavicon: v.optional(v.boolean()),
+  includeUsage: v.optional(v.boolean()),
+});
+type SearchArgs = Infer<typeof searchArgsValidator>;
 
-type ExtractArgs = {
-  urls: string[];
-  query?: string;
-  chunksPerSource?: number;
-  extractDepth?: "basic" | "advanced";
-  format?: "markdown" | "text";
-  includeImages?: boolean;
-  includeFavicon?: boolean;
-  includeUsage?: boolean;
-  timeout?: number;
-};
+const extractArgsValidator = v.object({
+  urls: v.array(v.string()),
+  query: v.optional(v.string()),
+  chunksPerSource: v.optional(v.number()),
+  extractDepth: v.optional(extractDepthValidator),
+  format: v.optional(formatValidator),
+  includeImages: v.optional(v.boolean()),
+  includeFavicon: v.optional(v.boolean()),
+  includeUsage: v.optional(v.boolean()),
+  timeout: v.optional(v.number()),
+});
+type ExtractArgs = Infer<typeof extractArgsValidator>;
 
 function compactRecord(entries: Array<[string, unknown]>) {
   return Object.fromEntries(entries.filter(([, value]) => value !== undefined));
@@ -215,7 +217,7 @@ function validateSearchArgs(args: SearchArgs) {
   ) {
     throw new Error("includeDomainsMode requires includeDomains.");
   }
-  if (args.filterByLanguage !== undefined && !args.language) {
+  if (args.filterByLanguage === true && !args.language) {
     throw new Error("filterByLanguage requires language.");
   }
   if (
@@ -290,14 +292,14 @@ function requireApiKey(): string {
 }
 
 async function callTavilyApi(
-  endpoint: string,
-  body: Record<string, unknown> | undefined,
+  endpoint: "/search" | "/extract" | "/map" | "/crawl",
+  body: Record<string, unknown>,
   timeoutSeconds: number,
 ) {
   const response = await fetch(`${TAVILY_BASE_URL}${endpoint}`, {
-    method: body === undefined ? "GET" : "POST",
+    method: "POST",
     headers: buildHeaders(requireApiKey()),
-    ...(body !== undefined && { body: JSON.stringify(body) }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutSeconds * 1_000),
   });
 
@@ -482,33 +484,7 @@ function normalizeExtractResponse(value: unknown) {
 }
 
 export const search = action({
-  args: {
-    query: v.string(),
-    searchDepth: v.optional(searchDepthValidator),
-    chunksPerSource: v.optional(v.number()),
-    topic: v.optional(topicValidator),
-    maxResults: v.optional(v.number()),
-    includeImages: v.optional(v.boolean()),
-    includeImageDescriptions: v.optional(v.boolean()),
-    includeAnswer: v.optional(answerModeValidator),
-    includeRawContent: v.optional(rawContentModeValidator),
-    includeDomains: v.optional(v.array(v.string())),
-    excludeDomains: v.optional(v.array(v.string())),
-    includeDomainsMode: v.optional(includeDomainsModeValidator),
-    timeRange: v.optional(timeRangeValidator),
-    startDate: v.optional(v.string()),
-    endDate: v.optional(v.string()),
-    includePublishedDate: v.optional(v.boolean()),
-    filterByPublishedDate: v.optional(v.boolean()),
-    country: v.optional(v.string()),
-    language: v.optional(v.string()),
-    filterByLanguage: v.optional(v.boolean()),
-    autoParameters: v.optional(v.boolean()),
-    exactMatch: v.optional(v.boolean()),
-    safeSearch: v.optional(v.boolean()),
-    includeFavicon: v.optional(v.boolean()),
-    includeUsage: v.optional(v.boolean()),
-  },
+  args: searchArgsValidator.fields,
   returns: searchResponseValidator,
   handler: async (_ctx, args) => {
     validateSearchArgs(args);
@@ -518,17 +494,7 @@ export const search = action({
 });
 
 export const extract = action({
-  args: {
-    urls: v.array(v.string()),
-    query: v.optional(v.string()),
-    chunksPerSource: v.optional(v.number()),
-    extractDepth: v.optional(extractDepthValidator),
-    format: v.optional(formatValidator),
-    includeImages: v.optional(v.boolean()),
-    includeFavicon: v.optional(v.boolean()),
-    includeUsage: v.optional(v.boolean()),
-    timeout: v.optional(v.number()),
-  },
+  args: extractArgsValidator.fields,
   returns: extractResponseValidator,
   handler: async (_ctx, args) => {
     validateExtractArgs(args);
@@ -714,166 +680,5 @@ export const crawl = action({
         failedResults: extracted.failedResults,
       }),
     };
-  },
-});
-
-const researchArgs = {
-  input: v.string(),
-  model: v.optional(
-    v.union(v.literal("mini"), v.literal("pro"), v.literal("auto")),
-  ),
-  outputSchema: v.optional(v.record(v.string(), v.any())),
-  citationFormat: v.optional(
-    v.union(
-      v.literal("numbered"),
-      v.literal("mla"),
-      v.literal("apa"),
-      v.literal("chicago"),
-    ),
-  ),
-  includeDomains: v.optional(v.array(v.string())),
-  excludeDomains: v.optional(v.array(v.string())),
-  outputLength: v.optional(
-    v.union(v.literal("short"), v.literal("standard"), v.literal("long")),
-  ),
-  files: v.optional(
-    v.array(
-      v.object({
-        name: v.string(),
-        data: v.string(),
-        type: v.optional(v.literal("base64")),
-      }),
-    ),
-  ),
-};
-const _researchArgsValidator = v.object(researchArgs);
-const researchResponseValidator = v.object({
-  ...responseMetadata,
-  requestId: v.string(),
-  status: v.union(
-    v.literal("pending"),
-    v.literal("in_progress"),
-    v.literal("completed"),
-    v.literal("failed"),
-  ),
-  createdAt: v.optional(v.string()),
-  input: v.optional(v.string()),
-  model: v.optional(v.string()),
-  content: v.optional(v.union(v.string(), v.record(v.string(), v.any()))),
-  // Keep source metadata intact, including file citations without a web URL.
-  sources: v.optional(v.array(v.record(v.string(), v.any()))),
-  error: v.optional(v.any()),
-});
-
-function validateResearch(args: Infer<typeof _researchArgsValidator>) {
-  if (!args.input.trim()) throw new Error("Research input must not be empty.");
-  for (const name of ["includeDomains", "excludeDomains"] as const) {
-    if ((args[name]?.length ?? 0) > 20)
-      throw new Error(`${name} accepts at most 20 domains.`);
-  }
-  if (
-    args.outputSchema !== undefined &&
-    !isRecord(args.outputSchema.properties)
-  ) {
-    throw new Error("outputSchema must contain a properties object.");
-  }
-  if ((args.files?.length ?? 0) > 5)
-    throw new Error("Research accepts at most 5 files.");
-  let words = 0;
-  for (const file of args.files ?? []) {
-    if (!/\.(txt|md|json)$/i.test(file.name))
-      throw new Error("Research files must use .txt, .md or .json.");
-    let text: string;
-    try {
-      const bytes = Uint8Array.from(atob(file.data), (c) => c.charCodeAt(0));
-      text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch {
-      throw new Error("Research file data must be base64-encoded UTF-8 text.");
-    }
-    words += text.trim() ? text.trim().split(/\s+/u).length : 0;
-  }
-  if (words > 80_000)
-    throw new Error(
-      "Research files must contain at most 80000 words combined.",
-    );
-}
-
-function normalizeResearch(
-  value: unknown,
-): Infer<typeof researchResponseValidator> {
-  if (
-    !isRecord(value) ||
-    typeof value.request_id !== "string" ||
-    !["pending", "in_progress", "completed", "failed"].includes(
-      String(value.status),
-    )
-  ) {
-    throw new Error("Tavily returned an invalid research response.");
-  }
-  if (
-    value.status === "completed" &&
-    ((typeof value.content !== "string" && !isRecord(value.content)) ||
-      !Array.isArray(value.sources) ||
-      !value.sources.every(isRecord))
-  ) {
-    throw new Error("Tavily returned an invalid research result.");
-  }
-  return {
-    ...metadata(value),
-    requestId: value.request_id,
-    status: value.status as Infer<typeof researchResponseValidator>["status"],
-    ...(typeof value.created_at === "string" && {
-      createdAt: value.created_at,
-    }),
-    ...(typeof value.input === "string" && { input: value.input }),
-    ...(typeof value.model === "string" && { model: value.model }),
-    ...((typeof value.content === "string" || isRecord(value.content)) && {
-      content: value.content,
-    }),
-    ...(Array.isArray(value.sources) && {
-      sources: value.sources as Record<string, unknown>[],
-    }),
-    ...(value.error !== undefined && { error: value.error }),
-  };
-}
-
-/** Submit once. Persist requestId in the app and read completion in a later action. */
-export const research = action({
-  args: researchArgs,
-  returns: researchResponseValidator,
-  handler: async (_ctx, args) => {
-    validateResearch(args);
-    const response = await callTavilyApi(
-      "/research",
-      compactRecord([
-        ["input", args.input],
-        ["model", args.model],
-        ["stream", false],
-        ["output_schema", args.outputSchema],
-        ["citation_format", args.citationFormat],
-        ["include_domains", args.includeDomains],
-        ["exclude_domains", args.excludeDomains],
-        ["output_length", args.outputLength],
-        ["files", args.files],
-      ]),
-      60,
-    );
-    return normalizeResearch(response);
-  },
-});
-
-/** Read task status; completed responses contain the full report and sources. */
-export const getResearch = action({
-  args: { requestId: v.string(), includeUsage: v.optional(v.boolean()) },
-  returns: researchResponseValidator,
-  handler: async (_ctx, args) => {
-    if (!args.requestId.trim()) throw new Error("requestId must not be empty.");
-    return normalizeResearch(
-      await callTavilyApi(
-        `/research/${encodeURIComponent(args.requestId)}${args.includeUsage === undefined ? "" : `?include_usage=${args.includeUsage}`}`,
-        undefined,
-        60,
-      ),
-    );
   },
 });
